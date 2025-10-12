@@ -1,0 +1,16 @@
+[project]
+name = "eanalizer"
+version = "0.1.0"
+description = "Aplikacja do analizy zużycia energii elektrycznej."
+authors = [{ name = "Your Name", email = "your@email.com" }]
+requires-python = ">=3.8"
+dependencies = [
+    "pandas>=2.0.0",
+    "openpyxl>=3.0.0",
+]
+
+[project.scripts]
+eanalizer = "eanalizer.cli:main"
+
+[tool.setuptools]
+packages = ["eanalizer"]
