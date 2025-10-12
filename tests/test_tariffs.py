@@ -6,35 +6,33 @@ class TestTariffManager(unittest.TestCase):
 
     def setUp(self):
         """Inicjalizuje managera taryf przed każdym testem."""
-        # Używamy lat, które obejmują nasze dane testowe i święta
         self.tariff_manager = TariffManager('config/tariffs.csv', years=range(2024, 2025))
 
     def test_g11_tariff(self):
         """Test dla taryfy G11 - zawsze powinna być jedna strefa."""
-        ts = datetime(2024, 5, 1, 10, 0) # Dzień świąteczny, środek dnia
-        self.assertEqual(self.tariff_manager.get_zone(ts, 'G11'), 'stala')
+        ts = datetime(2024, 5, 1, 10, 0)
+        zone, _ = self.tariff_manager.get_zone_and_price(ts, 'G11')
+        self.assertEqual(zone, 'stala')
 
     def test_g12_tariff_zones(self):
         """Test dla taryfy G12 - strefy dzienna i nocna."""
-        # Strefa niska (nocna)
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 1, 4, 0), 'G12'), 'niska')
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 1, 14, 0), 'G12'), 'niska')
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 1, 23, 0), 'G12'), 'niska')
-        # Strefa wysoka (dzienna)
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 1, 7, 0), 'G12'), 'wysoka')
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 1, 16, 0), 'G12'), 'wysoka')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 4, 0), 'G12')[0], 'niska')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 14, 0), 'G12')[0], 'niska')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 23, 0), 'G12')[0], 'niska')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 7, 0), 'G12')[0], 'wysoka')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 16, 0), 'G12')[0], 'wysoka')
 
     def test_g12w_tariff_zones(self):
         """Test dla taryfy G12w - uwzględnienie dni roboczych, weekendów i świąt."""
         # Dzień roboczy (wtorek)
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 2, 10, 0), 'G12w'), 'wysoka') # 10:00 - strefa wysoka
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 2, 22, 0), 'G12w'), 'niska')  # 22:00 - strefa niska
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 10, 0), 'G12w')[0], 'wysoka')
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 2, 22, 0), 'G12w')[0], 'niska')
 
         # Weekend (sobota)
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 4, 6, 10, 0), 'G12w'), 'niska') # 10:00 w weekend - strefa niska
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 4, 6, 10, 0), 'G12w')[0], 'niska')
 
         # Święto (1 maja 2024, środa)
-        self.assertEqual(self.tariff_manager.get_zone(datetime(2024, 5, 1, 10, 0), 'G12w'), 'niska') # 10:00 w święto - strefa niska
+        self.assertEqual(self.tariff_manager.get_zone_and_price(datetime(2024, 5, 1, 10, 0), 'G12w')[0], 'niska')
 
 if __name__ == '__main__':
     unittest.main()

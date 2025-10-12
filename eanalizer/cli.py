@@ -19,7 +19,7 @@ def main():
     group.add_argument("-p", "--pliki", nargs='+', help="Lista plików z danymi do analizy.")
     group.add_argument("-k", "--katalog", help="Ścieżka do katalogu, z którego zostaną wczytane wszystkie pliki .csv.")
 
-    parser.add_argument("-t", "--taryfa", choices=['G11', 'G12', 'G12w'], required=True, help="Określa taryfę energetyczną do analizy.")
+    parser.add_argument("-t", "--taryfa", choices=['G11', 'G12', 'G12w'], default='G11', help="Określa taryfę energetyczną do analizy (domyślnie: G11).")
     parser.add_argument("--data-start", help="Data początkowa analizy (format RRRR-MM-DD).")
     parser.add_argument("--data-koniec", help="Data końcowa analizy (format RRRR-MM-DD).")
 
@@ -68,12 +68,13 @@ def main():
         summary, simulation_df = simulate_physical_storage(filtered_data, args.magazyn_fizyczny, tariff_manager, args.taryfa)
         
         print("\n--- Wyniki symulacji magazynu fizycznego ---")
-        for zone, value in sorted(summary['pobor_z_sieci'].items()):
-            print(f"Energia pobrana z sieci w strefie [{zone.upper()}]: {value:.3f} kWh")
-        for zone, value in sorted(summary['oddanie_do_sieci'].items()):
-            print(f"Energia oddana do sieci w strefie [{zone.upper()}]: {value:.3f} kWh")
-        
-        print("---------------------------------------------")
+        for zone, stats in sorted(summary['strefy'].items()):
+            print(f"\n--- STREFA: {zone.upper()} (cena: {stats['price']:.2f} zł/kWh) ---")
+            print(f"Energia pobrana z sieci: {stats['pobor_z_sieci']:.3f} kWh (koszt: {stats['koszt_poboru']:.2f} zł)")
+            print(f"Energia oddana do sieci:  {stats['oddanie_do_sieci']:.3f} kWh")
+
+        print("\n---------------------------------------------")
+        print(f"SUMARYCZNY KOSZT (z magazynem): {summary.get('calkowity_koszt', 0):.2f} zł")
         print(f"Zaoszczędzona energia dzięki magazynowi: {summary.get('oszczednosc', 0):.3f} kWh")
         print("---------------------------------------------")
 
