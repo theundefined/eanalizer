@@ -1,0 +1,15 @@
+tariff,zone_name,day_type,start_hour,end_hour
+G12,wysoka,weekday,6,13
+G12,wysoka,weekday,15,22
+G12,niska,weekday,0,6
+G12,niska,weekday,13,15
+G12,niska,weekday,22,24
+G12,wysoka,weekend,6,13
+G12,wysoka,weekend,15,22
+G12,niska,weekend,0,6
+G12,niska,weekend,13,15
+G12,niska,weekend,22,24
+G12w,wysoka,weekday,6,21
+G12w,niska,weekday,0,6
+G12w,niska,weekday,21,24
+G12w,niska,weekend,0,24

@@ -7,6 +7,7 @@ requires-python = ">=3.8"
 dependencies = [
     "pandas>=2.0.0",
     "openpyxl>=3.0.0",
+    "holidays>=0.40",
 ]
 
 [project.scripts]
