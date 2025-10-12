@@ -14,5 +14,3 @@ venv/
 
 # Pliki danych użytkownika
 data/
-*.csv
-*.xlsx
