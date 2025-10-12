@@ -30,7 +30,7 @@ Aby uruchomić zestaw testów jednostkowych, wykonaj polecenie w głównym katal
 
 
 ### Podstawowa analiza z podziałem na strefy
-Analiza wszystkich plików `.csv` z katalogu `data` dla taryfy `G12w`. Wyniki zostaną przedstawione z podziałem na strefy `niska` i `wysoka`.
+Analiza wszystkich plików `.csv` z katalogu `data` dla taryfy `G12w`. Wyniki (ilość energii, stan magazynu net-billing oraz **koszt**) zostaną przedstawione z podziałem na strefy `niska` i `wysoka`.
 ```bash
 .venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w
 ```
@@ -42,7 +42,7 @@ Analiza danych dla taryfy `G12` w okresie od 1 stycznia do 31 marca 2024.
 ```
 
 ### Symulacja fizycznego magazynu energii (z uwzględnieniem taryf)
-Symulacja magazynu o pojemności 10 kWh dla taryfy `G12w`. Wyniki (pobór/oddanie do sieci) zostaną pokazane z podziałem na strefy. Dodatkowo, szczegółowe wyniki godzinowe zostaną wyeksportowane do pliku `symulacja.csv`.
+Symulacja magazynu o pojemności 10 kWh dla taryfy `G12w`. Wyniki (pobór/oddanie do sieci oraz **koszt**) zostaną pokazane z podziałem na strefy. Dodatkowo, szczegółowe wyniki godzinowe zostaną wyeksportowane do pliku `symulacja.csv`.
 ```bash
 .venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w --magazyn-fizyczny 10 --eksport-symulacji symulacja.csv
 ```

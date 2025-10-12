@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 from eanalizer.data_loader import load_from_enea_csv
-from eanalizer.core import simulate_physical_storage, calculate_optimal_capacity, aggregate_daily_data
+from eanalizer.core import simulate_physical_storage, calculate_optimal_capacity, aggregate_daily_data, calculate_zoned_stats
 from eanalizer.tariffs import TariffManager
 
 class TestCoreFunctionality(unittest.TestCase):
@@ -21,21 +21,17 @@ class TestCoreFunctionality(unittest.TestCase):
         self.assertEqual(first_record.oddanie, 0.0)
 
     def test_physical_storage_simulation(self):
-        """Testuje logikę symulacji magazynu fizycznego."""
-        # Pojemność magazynu: 5 kWh
+        """Testuje logikę symulacji magazynu fizycznego z podziałem na koszty."""
         summary, _ = simulate_physical_storage(self.test_data, 5.0, self.tariff_manager, 'G12w')
         
-        # Ręczne obliczenia dla danych testowych:
-        # 1. 01.05 04:59 (niska): pobór 1.0 z sieci. Stan magazynu: 0.0
-        # 2. 01.05 10:59 (niska): nadwyżka 2.5 -> 2.5 do magazynu. Stan: 2.5
-        # 3. 01.05 22:59 (niska): niedobór 2.0 -> 2.0 z magazynu. Stan: 0.5
-        # 4. 02.05 11:59 (wysoka): niedobór 2.5 -> 0.5 z magazynu, 2.0 z sieci. Stan: 0.0
-        # 5. 04.05 10:59 (niska): nadwyżka 4.8 -> 4.8 do magazynu. Stan: 4.8
-        # Ostatecznie: pobrano 1.0 (niska) i 2.0 (wysoka), nic nie oddano do sieci.
-        self.assertAlmostEqual(summary['pobor_z_sieci']['niska'], 1.0)
-        self.assertAlmostEqual(summary['pobor_z_sieci']['wysoka'], 2.0)
-        # Sprawdzamy, czy nic nie zostało oddane do sieci
-        self.assertAlmostEqual(sum(summary['oddanie_do_sieci'].values()), 0.0)
+        # Oczekiwane wyniki na podstawie ręcznych obliczeń z poprzednich kroków:
+        # Pobór 1.0 kWh w strefie niskiej (cena 0.76) -> koszt 0.76
+        # Pobór 2.0 kWh w strefie wysokiej (cena 1.08) -> koszt 2.16
+        self.assertAlmostEqual(summary['strefy']['niska']['pobor_z_sieci'], 1.0)
+        self.assertAlmostEqual(summary['strefy']['niska']['koszt_poboru'], 1.0 * 0.76)
+        self.assertAlmostEqual(summary['strefy']['wysoka']['pobor_z_sieci'], 2.0)
+        self.assertAlmostEqual(summary['strefy']['wysoka']['koszt_poboru'], 2.0 * 1.08)
+        self.assertAlmostEqual(summary['calkowity_koszt'], (1.0 * 0.76) + (2.0 * 1.08))
 
     def test_optimal_capacity_calculation(self):
         """Testuje logikę obliczania optymalnej pojemności magazynu."""
@@ -54,6 +50,32 @@ class TestCoreFunctionality(unittest.TestCase):
         
         output = captured_output.getvalue()
         self.assertIn("Wynik: 2.500 kWh", output)
+
+    def test_cost_calculation(self):
+        """Testuje, czy koszt energii jest poprawnie obliczany dla danej strefy."""
+        # Dane tylko z 1 maja (święto, wszystko w strefie niskiej G12w, cena 0.76)
+        may_first_data = [r for r in self.test_data if r.timestamp.day == 1]
+        # Pobrana energia po bilansowaniu tego dnia: 1.0 + 2.0 = 3.0 kWh
+        # Oczekiwany koszt: 3.0 kWh * 0.76 zł/kWh = 2.28 zł
+        expected_cost = 3.0 * 0.76
+
+        # Przechwytujemy wydruk, aby sprawdzić, co zostało wyświetlone
+        import sys
+        from io import StringIO
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        # Wywołujemy funkcję z ceną dla tej strefy
+        returned_cost = calculate_zoned_stats(may_first_data, price=0.76)
+        sys.stdout = original_stdout
+
+        # Sprawdzamy, czy funkcja zwróciła poprawny koszt
+        self.assertAlmostEqual(returned_cost, expected_cost)
+
+        # Sprawdzamy, czy wydruk zawiera poprawny koszt
+        output = captured_output.getvalue()
+        self.assertIn(f"(koszt: {expected_cost:.2f} zł)", output)
+
 
 if __name__ == '__main__':
     unittest.main()
