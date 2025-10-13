@@ -4,6 +4,34 @@ from .models import EnergyData, SimulationResult
 from .tariffs import TariffManager
 import pandas as pd
 
+def find_missing_hours(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]):
+    """Znajduje i raportuje brakujące godziny w zadanym przez użytkownika zakresie."""
+    if not data or not (start_date_str or end_date_str):
+        return
+
+    df = pd.DataFrame(data).set_index('timestamp')
+    
+    # Używamy dat podanych przez użytkownika do stworzenia idealnego zakresu
+    start_time = pd.to_datetime(start_date_str) if start_date_str else df.index.min()
+    # Ustawiamy koniec dnia dla daty końcowej
+    end_time = pd.to_datetime(end_date_str).replace(hour=23, minute=59) if end_date_str else df.index.max()
+
+    # Tworzymy idealny zakres godzinowy (z poprawionym 'h')
+    expected_range = pd.date_range(start=start_time, end=end_time, freq='h')
+
+    missing_timestamps = expected_range.difference(df.index)
+
+    if not missing_timestamps.empty:
+        print("\n--- UWAGA: Wykryto brakujące godziny w danych ---")
+        # Grupujemy komunikaty, jeśli jest ich dużo
+        if len(missing_timestamps) > 24:
+            print(f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone.")
+        for ts in missing_timestamps[:24]: # Wyświetlamy max 24 pierwsze braki
+            print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}")
+        if len(missing_timestamps) > 24:
+            print("...")
+        print("-------------------------------------------------")
+
 def filter_data_by_date(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]) -> List[EnergyData]:
     """Filtruje listę danych na podstawie podanego zakresu dat."""
     if not start_date_str and not end_date_str:
@@ -75,7 +103,6 @@ def calculate_zoned_stats(data: List[EnergyData], price: float) -> float:
     return cost
 
 def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_manager: TariffManager, tariff: str) -> Tuple[Dict[str, Any], pd.DataFrame]:
-    """Przeprowadza symulację fizycznego magazynu energii godzina po godzinie, zliczając wyniki i koszty dla stref taryfowych."""
     if not data:
         return {}, pd.DataFrame()
 
