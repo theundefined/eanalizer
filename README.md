@@ -49,8 +49,8 @@ Symulacja magazynu o pojemności 10 kWh dla taryfy `G12w`. Wyniki (pobór/oddani
 
 ### Inne opcje
 
-*   **Eksport danych dziennych:** Dodaj `--eksport-dzienny <nazwa_pliku>.csv` do polecenia standardowej analizy (bez symulacji magazynu fizycznego).
-### Obliczanie optymalnej pojemności magazynu
+    *   **Obliczanie optymalnej pojemności magazynu:** Dodaj flagę `--oblicz-optymalny-magazyn` do polecenia standardowej analizy.
+    *   **Analiza Net-metering:** Dodaj flagę `--z-netmetering`, aby włączyć obliczenia dla wirtualnego magazynu. Obliczenia uwzględniają kaskadowe rozliczanie między strefami (nadwyżka z droższej strefy przechodzi na tańszą). Możesz też użyć `--wspolczynnik-netmetering 0.7`, aby zmienić domyślny mnożnik.### Obliczanie optymalnej pojemności magazynu
 Analiza wszystkich plików z katalogu `data` w celu znalezienia optymalnej pojemności magazynu, która uwzględnia zarówno dni z nadprodukcją, jak i arbitraż taryfowy.
 ```bash
 .venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w --oblicz-optymalny-magazyn
