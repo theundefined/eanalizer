@@ -2,39 +2,29 @@ from typing import List, Optional, Dict, Tuple, Any
 from datetime import datetime
 from .models import EnergyData, SimulationResult
 from .tariffs import TariffManager
+from .price_fetcher import get_hourly_rce_prices
 import pandas as pd
 
-def find_missing_hours(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]):
-    """Znajduje i raportuje brakujące godziny w zadanym przez użytkownika zakresie."""
-    if not data or not (start_date_str or end_date_str):
+def run_rce_analysis(data: List[EnergyData], hourly_prices: Dict[datetime, float]):
+    if not data or not hourly_prices:
+        print("Brak danych lub cen RCE do przeprowadzenia analizy.")
         return
-
-    df = pd.DataFrame(data).set_index('timestamp')
-    
-    # Używamy dat podanych przez użytkownika do stworzenia idealnego zakresu
-    start_time = pd.to_datetime(start_date_str) if start_date_str else df.index.min()
-    # Ustawiamy koniec dnia dla daty końcowej
-    end_time = pd.to_datetime(end_date_str).replace(hour=23, minute=59) if end_date_str else df.index.max()
-
-    # Tworzymy idealny zakres godzinowy (z poprawionym 'h')
-    expected_range = pd.date_range(start=start_time, end=end_time, freq='h')
-
-    missing_timestamps = expected_range.difference(df.index)
-
-    if not missing_timestamps.empty:
-        print("\n--- UWAGA: Wykryto brakujące godziny w danych ---")
-        # Grupujemy komunikaty, jeśli jest ich dużo
-        if len(missing_timestamps) > 24:
-            print(f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone.")
-        for ts in missing_timestamps[:24]: # Wyświetlamy max 24 pierwsze braki
-            print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}")
-        if len(missing_timestamps) > 24:
-            print("...")
-        print("-------------------------------------------------")
+    total_cost, total_income = 0.0, 0.0
+    for record in data:
+        price = hourly_prices.get(record.timestamp)
+        if price is not None and not pd.isna(price):
+            total_cost += record.pobor * price
+            total_income += record.oddanie * price
+        else:
+            print(f"Ostrzeżenie: Brak ceny RCE dla godziny {record.timestamp}.")
+    print("\n--- Analiza finansowa (ceny RCE) ---")
+    print(f"SUMARYCZNY KOSZT energii pobranej: {total_cost:.2f} zł")
+    print(f"SUMARYCZNY PRZYCHÓD z energii oddanej: {total_income:.2f} zł")
+    print(f"BILANS FINANSOWY (przychód - koszt): {total_income - total_cost:.2f} zł")
+    print("----------------------------------------")
 
 def filter_data_by_date(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]) -> List[EnergyData]:
-    """Filtruje listę danych na podstawie podanego zakresu dat."""
-    if not start_date_str and not end_date_str:
+    if not data or not (start_date_str or end_date_str):
         return data
     try:
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d') if start_date_str else None
@@ -50,66 +40,67 @@ def filter_data_by_date(data: List[EnergyData], start_date_str: Optional[str], e
     print(f"Po filtrowaniu pozostało {len(filtered_list)} rekordów.")
     return filtered_list
 
-def run_analysis_with_tariffs(data: List[EnergyData], tariff: str, should_calc_optimal_capacity: bool, daily_export_path: Optional[str]):
-    """Główna funkcja uruchamiająca wszystkie standardowe analizy z uwzględnieniem taryf."""
+def run_analysis_with_tariffs(data: List[EnergyData], tariff: str, should_calc_optimal_capacity: bool, daily_export_path: Optional[str], net_metering_ratio: Optional[float]):
     if not data:
         print("Brak danych do analizy.")
         return
-
     min_year = min(d.timestamp.year for d in data)
     max_year = max(d.timestamp.year for d in data)
     tariff_manager = TariffManager('config/tariffs.csv', years=range(min_year, max_year + 1))
-
-    zoned_data: Dict[str, List[Tuple[EnergyData, float]]] = {}
+    zoned_data_raw: Dict[str, List[EnergyData]] = {}
+    zone_prices: Dict[str, float] = {}
     for record in data:
         zone, price = tariff_manager.get_zone_and_price(record.timestamp, tariff)
         if zone:
-            if zone not in zoned_data:
-                zoned_data[zone] = []
-            zoned_data[zone].append((record, price))
-
-    print("\n--- Podstawowe statystyki dla wybranego okresu (z podziałem na strefy) ---")
-    total_cost = 0
-    for zone, zone_data_with_price in sorted(zoned_data.items()):
-        price = zone_data_with_price[0][1]
-        zone_data = [item[0] for item in zone_data_with_price]
+            if zone not in zoned_data_raw:
+                zoned_data_raw[zone] = []
+                zone_prices[zone] = price
+            zoned_data_raw[zone].append(record)
+    sorted_zones = sorted(zone_prices, key=zone_prices.get, reverse=True)
+    print("\n--- Analiza zużycia i kosztów (ceny stałe z taryfy) ---")
+    rollover_credit = 0.0
+    total_cost = 0.0
+    for zone in sorted_zones:
+        zone_data = zoned_data_raw.get(zone, [])
+        price = zone_prices.get(zone, 0.0)
         print(f"\n--- STREFA: {zone.upper()} (cena: {price:.2f} zł/kWh) ---")
-        cost = calculate_zoned_stats(zone_data, price)
-        total_cost += cost
-    
+        total_pobrana_po = sum(d.pobor for d in zone_data)
+        total_oddana_po = sum(d.oddanie for d in zone_data)
+        print(f"Energia pobrana (po bilansowaniu): {total_pobrana_po:.3f} kWh")
+        print(f"Energia oddana (po bilansowaniu):  {total_oddana_po:.3f} kWh")
+        if net_metering_ratio is not None:
+            magazyn_w_strefie = total_oddana_po * net_metering_ratio
+            dostepny_kredyt = magazyn_w_strefie + rollover_credit
+            energia_do_oplacenia = max(0, total_pobrana_po - dostepny_kredyt)
+            koszt_strefy = energia_do_oplacenia * price
+            total_cost += koszt_strefy
+            rollover_credit = max(0, dostepny_kredyt - total_pobrana_po)
+            print(f"Wytworzony kredyt w strefie ({int(net_metering_ratio*100)}%): {magazyn_w_strefie:.3f} kWh")
+            print(f"Kredyt z poprzedniej strefy: {rollover_credit:.3f} kWh")
+            print(f"Energia do opłacenia w strefie: {energia_do_oplacenia:.3f} kWh (koszt: {koszt_strefy:.2f} zł)")
+        else:
+            koszt_strefy = total_pobrana_po * price
+            total_cost += koszt_strefy
+            print(f"Koszt energii pobranej: {koszt_strefy:.2f} zł")
     print("\n-----------------------------------------------------")
-    print(f"SUMARYCZNY KOSZT ENERGII POBRANEJ: {total_cost:.2f} zł")
+    print(f"SUMARYCZNY KOSZT ENERGII (po rozliczeniu): {total_cost:.2f} zł")
+    if net_metering_ratio is not None:
+        print(f"Niewykorzystany kredyt na koniec okresu: {rollover_credit:.3f} kWh")
     print("-----------------------------------------------------")
-
     daily_data_df = aggregate_daily_data(data)
     analyze_daily_trends(daily_data_df)
-
     if should_calc_optimal_capacity:
         calculate_optimal_capacity(data, daily_data_df, tariff_manager, tariff)
-
     if daily_export_path:
         export_to_csv(daily_data_df, daily_export_path)
 
-def calculate_zoned_stats(data: List[EnergyData], price: float) -> float:
-    """Oblicza statystyki dla strefy i zwraca koszt energii pobranej."""
-    total_pobrana_po = sum(d.pobor for d in data)
-    total_oddana_po = sum(d.oddanie for d in data)
-    magazyn_net_metering = (total_oddana_po * 0.8) - total_pobrana_po
-    cost = total_pobrana_po * price
-
-    print(f"Ilość pobranej energii (po bilansowaniu): {total_pobrana_po:.3f} kWh (koszt: {cost:.2f} zł)")
-    print(f"Ilość oddanej energii (po bilansowaniu):  {total_oddana_po:.3f} kWh")
-    print(f'Stan magazynu energii (net-billing): {magazyn_net_metering:.3f} kWh')
-    return cost
-
 def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_manager: TariffManager, tariff: str) -> Tuple[Dict[str, Any], pd.DataFrame]:
     if not data:
-        return {}, pd.DataFrame()
-
+        return {},
+    pd.DataFrame()
     stan_magazynu = 0.0
     wyniki_symulacji = []
     stats: Dict[str, Any] = {'strefy': {}}
-
     for rekord in data:
         pobor_z_magazynu, oddanie_do_magazynu, pobor_z_sieci, oddanie_do_sieci = 0.0, 0.0, 0.0, 0.0
         if rekord.oddanie_przed > rekord.pobor_przed:
@@ -124,7 +115,6 @@ def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_ma
             pobor_z_magazynu = do_rozladowania
             stan_magazynu -= do_rozladowania
             pobor_z_sieci = niedobor - do_rozladowania
-
         zone, price = tariff_manager.get_zone_and_price(rekord.timestamp, tariff)
         if zone:
             if zone not in stats['strefy']:
@@ -132,14 +122,11 @@ def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_ma
             stats['strefy'][zone]['pobor_z_sieci'] += pobor_z_sieci
             stats['strefy'][zone]['oddanie_do_sieci'] += oddanie_do_sieci
             stats['strefy'][zone]['koszt_poboru'] += pobor_z_sieci * price
-
         wyniki_symulacji.append(SimulationResult(timestamp=rekord.timestamp, pobor_z_sieci=pobor_z_sieci, oddanie_do_sieci=oddanie_do_sieci, pobor_z_magazynu=pobor_z_magazynu, oddanie_do_magazynu=oddanie_do_magazynu, stan_magazynu=stan_magazynu))
-
     oryginalny_pobor = sum(d.pobor_przed for d in data)
     calkowity_pobor_z_sieci = sum(zone_stats['pobor_z_sieci'] for zone_stats in stats['strefy'].values())
     stats['oszczednosc'] = oryginalny_pobor - calkowity_pobor_z_sieci
     stats['calkowity_koszt'] = sum(zone_stats['koszt_poboru'] for zone_stats in stats['strefy'].values())
-
     return stats, pd.DataFrame(wyniki_symulacji)
 
 def aggregate_daily_data(data: List[EnergyData]) -> pd.DataFrame:
@@ -195,3 +182,21 @@ def analyze_daily_trends(daily_df: pd.DataFrame):
     print(f"Liczba dni z nadprodukcją energii: {net_export_days_count} z {total_days} dni")
     print(f"Procent dni z nadprodukcją energii: {percentage:.2f}%")
     print("-----------------------------------")
+
+def find_missing_hours(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]):
+    if not data or not (start_date_str or end_date_str):
+        return
+    df = pd.DataFrame(data).set_index('timestamp')
+    start_time = pd.to_datetime(start_date_str) if start_date_str else df.index.min()
+    end_time = pd.to_datetime(end_date_str).replace(hour=23, minute=59) if end_date_str else df.index.max()
+    expected_range = pd.date_range(start=start_time, end=end_time, freq='h')
+    missing_timestamps = expected_range.difference(df.index)
+    if not missing_timestamps.empty:
+        print("\n--- UWAGA: Wykryto brakujące godziny w danych ---")
+        if len(missing_timestamps) > 24:
+            print(f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone.")
+        for ts in missing_timestamps[:24]:
+            print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}")
+        if len(missing_timestamps) > 24:
+            print("...")
+        print("-------------------------------------------------")
