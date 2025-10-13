@@ -40,7 +40,7 @@ def load_from_enea_csv(file_path: str) -> List[EnergyData]:
 
         # --- Ręczne czyszczenie i konwersja ---
         df['timestamp'] = df['timestamp'].str.replace('=', '').str.replace('"', '')
-        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.floor('h')
 
         for col in ['pobor_przed', 'oddanie_przed', 'pobor', 'oddanie']:
             df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')

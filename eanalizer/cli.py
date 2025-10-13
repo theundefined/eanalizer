@@ -8,7 +8,8 @@ from .core import (
     filter_data_by_date, 
     export_to_csv, 
     simulate_physical_storage,
-    run_analysis_with_tariffs
+    run_analysis_with_tariffs,
+    find_missing_hours
 )
 
 def main():
@@ -54,6 +55,10 @@ def main():
     print(f"\nŁącznie wczytano {len(all_energy_data)} rekordów.")
 
     filtered_data = filter_data_by_date(all_energy_data, args.data_start, args.data_koniec)
+
+    # Jeśli podano zakres dat, sprawdź brakujące godziny
+    if args.data_start or args.data_koniec:
+        find_missing_hours(filtered_data, args.data_start, args.data_koniec)
     
     if not filtered_data:
         print("Brak danych w podanym zakresie dat do dalszej analizy.")
