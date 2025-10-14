@@ -8,50 +8,40 @@ Aplikacja do analizy zużycia energii elektrycznej na podstawie danych od operat
     ```bash
     sudo apt install python3.12-venv
     ```
-2.  Utwórz wirtualne środowisko:
+2.  Utwórz wirtualne środowisko (jeśli nie zrobi tego za Ciebie skrypt `eanalizer.sh` przy pierwszym uruchomieniu):
     ```bash
     python3 -m venv .venv
-    ```
-3.  Zainstaluj program i jego zależności (w tym `pandas` i `holidays`):
-    ```bash
     .venv/bin/pip install -e .
     ```
 
 ## Użycie
 
-Program wymaga podania taryfy (`--taryfa`) oraz danych wejściowych (`--pliki` lub `--katalog`).
+Program najłatwiej uruchomić za pomocą skryptu `eanalizer.sh`, który automatycznie zarządza wirtualnym środowiskiem. Po prostu wywołaj go, podając odpowiednie flagi.
 
-## Testowanie
-
-Aby uruchomić zestaw testów jednostkowych, wykonaj polecenie w głównym katalogu projektu:
+### Podstawowa analiza (ceny taryfowe)
+Analiza dla taryfy `G12w` z włączonymi obliczeniami net-meteringu.
 ```bash
-.venv/bin/python -m unittest discover tests
+./eanalizer.sh --katalog data --taryfa G12w --z-netmetering
 ```
 
-
-### Podstawowa analiza z podziałem na strefy
-Analiza wszystkich plików `.csv` z katalogu `data` dla taryfy `G12w`. Wyniki (ilość energii, stan magazynu net-billing oraz **koszt**) zostaną przedstawione z podziałem na strefy `niska` i `wysoka`.
+### Analiza finansowa (ceny rynkowe RCE)
+Analiza dla okresu od 1 do 3 lipca 2024 z użyciem rzeczywistych, pobieranych z API cen RCE.
 ```bash
-.venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w
+./eanalizer.sh --katalog data --data-start 2024-07-01 --data-koniec 2024-07-03 --z-cenami-rce
 ```
 
-### Analiza w zadanym okresie
-Analiza danych dla taryfy `G12` w okresie od 1 stycznia do 31 marca 2024.
+### Symulacja fizycznego magazynu energii
+Symulacja magazynu o pojemności 10 kWh dla taryfy `G12w` z eksportem wyników do pliku.
 ```bash
-.venv/bin/python -m eanalizer.cli --katalog data --taryfa G12 --data-start 2024-01-01 --data-koniec 2024-03-31
+./eanalizer.sh --katalog data --taryfa G12w --magazyn-fizyczny 10 --eksport-symulacji symulacja.csv
 ```
 
-### Symulacja fizycznego magazynu energii (z uwzględnieniem taryf)
-Symulacja magazynu o pojemności 10 kWh dla taryfy `G12w`. Wyniki (pobór/oddanie do sieci oraz **koszt**) zostaną pokazane z podziałem na strefy. Dodatkowo, szczegółowe wyniki godzinowe zostaną wyeksportowane do pliku `symulacja.csv`.
+### Obliczanie optymalnej pojemności magazynu
 ```bash
-.venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w --magazyn-fizyczny 10 --eksport-symulacji symulacja.csv
+./eanalizer.sh --katalog data --taryfa G12w --oblicz-optymalny-magazyn
 ```
 
-### Inne opcje
+### Inne popularne opcje
 
-    *   **Obliczanie optymalnej pojemności magazynu:** Dodaj flagę `--oblicz-optymalny-magazyn` do polecenia standardowej analizy.
-    *   **Analiza Net-metering:** Dodaj flagę `--z-netmetering`, aby włączyć obliczenia dla wirtualnego magazynu. Obliczenia uwzględniają kaskadowe rozliczanie między strefami (nadwyżka z droższej strefy przechodzi na tańszą). Możesz też użyć `--wspolczynnik-netmetering 0.7`, aby zmienić domyślny mnożnik.### Obliczanie optymalnej pojemności magazynu
-Analiza wszystkich plików z katalogu `data` w celu znalezienia optymalnej pojemności magazynu, która uwzględnia zarówno dni z nadprodukcją, jak i arbitraż taryfowy.
-```bash
-.venv/bin/python -m eanalizer.cli --katalog data --taryfa G12w --oblicz-optymalny-magazyn
-```
+*   `--eksport-dzienny <plik.csv>`: Zapisuje dzienne podsumowanie zużycia do pliku CSV.
+*   `--wspolczynnik-netmetering 0.7`: Zmienia domyślny współczynnik net-meteringu (0.8) na inny.
