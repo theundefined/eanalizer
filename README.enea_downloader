@@ -1,0 +1,16 @@
+# Enea Downloader
+
+`enea_downloader.py` to program służący do automatycznego pobierania danych dotyczących zużycia energii ze strony internetowej Enea.
+
+## Funkcjonalność
+
+Program automatyzuje proces logowania się na konto użytkownika Enea i pobierania szczegółowych danych o zużyciu energii.
+
+## Pierwsze uruchomienie
+
+Przy pierwszym uruchomieniu, program poprosi użytkownika o podanie następujących danych:
+- Login (adres e-mail)
+- Hasło
+- Identyfikator klienta (numer kontrahenta)
+
+Podane dane zostaną zapisane w pliku konfiguracyjnym `config.ini`, aby umożliwić automatyczne logowanie przy kolejnych uruchomieniach. Dzięki temu użytkownik не będzie musiał ponownie wprowadzać swoich danych uwierzytelniających.
