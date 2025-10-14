@@ -1,6 +1,7 @@
 # e-analizer
 
 Aplikacja do analizy zużycia energii elektrycznej na podstawie danych od operatora.
+W większości stworzona przy użyciu GEMINI
 
 ## Instalacja
 
@@ -13,6 +14,9 @@ Aplikacja do analizy zużycia energii elektrycznej na podstawie danych od operat
     python3 -m venv .venv
     .venv/bin/pip install -e .
     ```
+
+## Dane
+Pobierz dane w formacie CSV z https://ebok.enea.pl/meter/summaryBalancingChart - dla każdego roku osobno, umieść je w katalogu data
 
 ## Użycie
 
