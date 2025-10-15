@@ -2,7 +2,6 @@ from typing import List, Optional, Dict, Tuple, Any
 from datetime import datetime
 from .models import EnergyData, SimulationResult
 from .tariffs import TariffManager
-from .price_fetcher import get_hourly_rce_prices
 import pandas as pd
 
 def run_rce_analysis(data: List[EnergyData], hourly_prices: Dict[datetime, float]):
@@ -94,15 +93,18 @@ def run_analysis_with_tariffs(data: List[EnergyData], tariff: str, should_calc_o
     if daily_export_path:
         export_to_csv(daily_data_df, daily_export_path)
 
-def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_manager: TariffManager, tariff: str) -> Tuple[Dict[str, Any], pd.DataFrame]:
+def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_manager: TariffManager, tariff: str, net_metering_ratio: Optional[float] = None) -> Tuple[Dict[str, Any], pd.DataFrame]:
     if not data:
-        return {},
-    pd.DataFrame()
+        return {}, pd.DataFrame()
+
     stan_magazynu = 0.0
     wyniki_symulacji = []
     stats: Dict[str, Any] = {'strefy': {}}
+
+    # First, run the hourly simulation
     for rekord in data:
         pobor_z_magazynu, oddanie_do_magazynu, pobor_z_sieci, oddanie_do_sieci = 0.0, 0.0, 0.0, 0.0
+
         if rekord.oddanie_przed > rekord.pobor_przed:
             nadwyzka = rekord.oddanie_przed - rekord.pobor_przed
             do_naladowania = min(nadwyzka, capacity - stan_magazynu)
@@ -115,18 +117,63 @@ def simulate_physical_storage(data: List[EnergyData], capacity: float, tariff_ma
             pobor_z_magazynu = do_rozladowania
             stan_magazynu -= do_rozladowania
             pobor_z_sieci = niedobor - do_rozladowania
+
         zone, price = tariff_manager.get_zone_and_price(rekord.timestamp, tariff)
         if zone:
             if zone not in stats['strefy']:
                 stats['strefy'][zone] = {'pobor_z_sieci': 0, 'oddanie_do_sieci': 0, 'koszt_poboru': 0, 'price': price}
             stats['strefy'][zone]['pobor_z_sieci'] += pobor_z_sieci
             stats['strefy'][zone]['oddanie_do_sieci'] += oddanie_do_sieci
+            # We calculate gross cost here, but it will be overwritten if net-metering is on
             stats['strefy'][zone]['koszt_poboru'] += pobor_z_sieci * price
-        wyniki_symulacji.append(SimulationResult(timestamp=rekord.timestamp, pobor_z_sieci=pobor_z_sieci, oddanie_do_sieci=oddanie_do_sieci, pobor_z_magazynu=pobor_z_magazynu, oddanie_do_magazynu=oddanie_do_magazynu, stan_magazynu=stan_magazynu))
+        
+        wyniki_symulacji.append(SimulationResult(
+            timestamp=rekord.timestamp,
+            pobor_z_sieci=pobor_z_sieci,
+            oddanie_do_sieci=oddanie_do_sieci,
+            pobor_z_magazynu=pobor_z_magazynu,
+            oddanie_do_magazynu=oddanie_do_magazynu,
+            stan_magazynu=stan_magazynu
+        ))
+
+    # Second, calculate costs based on aggregated zone data
+    if net_metering_ratio is not None:
+        total_cost = 0.0
+        rollover_credit = 0.0
+        
+        zone_prices = {zone: stats['strefy'][zone]['price'] for zone in stats['strefy']}
+        sorted_zones = sorted(zone_prices, key=zone_prices.get, reverse=True)
+
+        for zone in sorted_zones:
+            zone_stats = stats['strefy'][zone]
+            price = zone_prices[zone]
+            
+            pobor_z_sieci = zone_stats['pobor_z_sieci']
+            oddanie_do_sieci = zone_stats['oddanie_do_sieci']
+
+            magazyn_w_strefie = oddanie_do_sieci * net_metering_ratio
+            dostepny_kredyt = magazyn_w_strefie + rollover_credit
+            energia_do_oplacenia = max(0, pobor_z_sieci - dostepny_kredyt)
+            koszt_strefy = energia_do_oplacenia * price
+            total_cost += koszt_strefy
+            
+            # Update stats for printing in cli
+            zone_stats['koszt_poboru'] = koszt_strefy # Overwrite with net cost
+            zone_stats['magazyn_w_strefie'] = magazyn_w_strefie
+            zone_stats['kredyt_z_poprzedniej'] = rollover_credit
+            zone_stats['energia_do_oplacenia'] = energia_do_oplacenia
+
+            rollover_credit = max(0, dostepny_kredyt - pobor_z_sieci)
+
+        stats['calkowity_koszt'] = total_cost
+        stats['niewykorzystany_kredyt_koncowy'] = rollover_credit
+    else:
+        stats['calkowity_koszt'] = sum(zone_stats['koszt_poboru'] for zone_stats in stats['strefy'].values())
+
     oryginalny_pobor = sum(d.pobor_przed for d in data)
     calkowity_pobor_z_sieci = sum(zone_stats['pobor_z_sieci'] for zone_stats in stats['strefy'].values())
     stats['oszczednosc'] = oryginalny_pobor - calkowity_pobor_z_sieci
-    stats['calkowity_koszt'] = sum(zone_stats['koszt_poboru'] for zone_stats in stats['strefy'].values())
+    
     return stats, pd.DataFrame(wyniki_symulacji)
 
 def aggregate_daily_data(data: List[EnergyData]) -> pd.DataFrame:

@@ -65,7 +65,7 @@ def main():
         print(f"Najstarsze dane pochodzą z: {oldest_date.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Najnowsze dane pochodzą z: {newest_date.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
-        print(f"\nNie wczytano żadnych rekordów.")
+        print("\nNie wczytano żadnych rekordów.")
 
     filtered_data = filter_data_by_date(all_energy_data, args.data_start, args.data_koniec)
     
@@ -89,16 +89,31 @@ def main():
         tariff_manager = TariffManager('config/tariffs.csv', years=range(min_year, max_year + 1))
 
         print(f"\nUruchamiam symulację fizycznego magazynu energii o pojemności {args.magazyn_fizyczny} kWh...")
-        summary, simulation_df = simulate_physical_storage(filtered_data, args.magazyn_fizyczny, tariff_manager, args.taryfa)
+        net_metering_ratio = args.wspolczynnik_netmetering if args.z_netmetering else None
+        summary, simulation_df = simulate_physical_storage(
+            filtered_data, 
+            args.magazyn_fizyczny, 
+            tariff_manager, 
+            args.taryfa,
+            net_metering_ratio=net_metering_ratio
+        )
         
         print("\n--- Wyniki symulacji magazynu fizycznego ---")
         for zone, stats in sorted(summary['strefy'].items()):
             print(f"\n--- STREFA: {zone.upper()} (cena: {stats['price']:.2f} zł/kWh) ---")
-            print(f"Energia pobrana z sieci: {stats['pobor_z_sieci']:.3f} kWh (koszt: {stats['koszt_poboru']:.2f} zł)")
+            print(f"Energia pobrana z sieci: {stats['pobor_z_sieci']:.3f} kWh")
             print(f"Energia oddana do sieci:  {stats['oddanie_do_sieci']:.3f} kWh")
+            if net_metering_ratio is not None:
+                print(f"Wytworzony kredyt w strefie ({int(net_metering_ratio*100)}%): {stats.get('magazyn_w_strefie', 0):.3f} kWh")
+                print(f"Kredyt z poprzedniej strefy: {stats.get('kredyt_z_poprzedniej', 0):.3f} kWh")
+                print(f"Energia do opłacenia w strefie: {stats.get('energia_do_oplacenia', 0):.3f} kWh (koszt: {stats.get('koszt_poboru', 0):.2f} zł)")
+            else:
+                print(f"Koszt poboru z sieci: {stats.get('koszt_poboru', 0):.2f} zł")
 
         print("\n---------------------------------------------")
         print(f"SUMARYCZNY KOSZT (z magazynem): {summary.get('calkowity_koszt', 0):.2f} zł")
+        if net_metering_ratio is not None:
+            print(f"Niewykorzystany kredyt na koniec okresu: {summary.get('niewykorzystany_kredyt_koncowy', 0):.3f} kWh")
         print(f"Zaoszczędzona energia dzięki magazynowi: {summary.get('oszczednosc', 0):.3f} kWh")
         print("---------------------------------------------")
 

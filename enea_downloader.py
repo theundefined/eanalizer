@@ -4,7 +4,6 @@ import configparser
 import json
 import re
 import requests
-import sys
 import os
 import getpass
 from datetime import datetime, timedelta
