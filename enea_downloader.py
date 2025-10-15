@@ -17,9 +17,7 @@ def create_config():
     print("Configuration file not found. Please provide your credentials.")
     email = input("Email: ")
     password = getpass.getpass("Password: ")
-    customer_id = input("Customer ID: ")
 
-    # Validate credentials by logging in
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
         'Referer': 'https://ebok.enea.pl/logowanie'
@@ -52,6 +50,62 @@ def create_config():
         except requests.exceptions.RequestException as e:
             print(f"Error during login: {e}")
             exit()
+
+        # Find all available customer profiles
+        customers = re.findall(r'<span>\s*(\d+)\s*</span>.*?href="/dashboard/select-current-client/([a-f0-9\-]+)"', login_response.text, re.DOTALL)
+
+        if not customers:
+            print("Error: No customer profiles found for this account.")
+            exit()
+
+        print("Verifying which profiles have hourly data...")
+        valid_customers = []
+        for id, guid in customers:
+            print(f"Checking profile {id}... ", end="")
+            try:
+                # Select the client to set the context
+                headers['Referer'] = 'https://ebok.enea.pl/dashboard/many-clients'
+                client_selection_url = f'https://ebok.enea.pl/dashboard/select-current-client/{guid}'
+                client_response = session.get(client_selection_url, headers=headers)
+                client_response.raise_for_status()
+
+                # Check the summary balancing chart page for the required data
+                headers['Referer'] = 'https://ebok.enea.pl/dashboard'
+                summary_page = session.get('https://ebok.enea.pl/meter/summaryBalancingChart', headers=headers)
+                summary_page.raise_for_status()
+
+                if 'data-point-of-delivery-id="' in summary_page.text:
+                    valid_customers.append((id, guid))
+                    print("OK")
+                else:
+                    print("No hourly data.")
+
+            except requests.exceptions.RequestException as e:
+                print(f"Failed to verify profile {id}: {e}")
+
+        if not valid_customers:
+            print("Error: No customer profiles with available hourly data found for this account.")
+            exit()
+
+        customer_id = None
+        if len(valid_customers) == 1:
+            customer_id = valid_customers[0][0]
+            print(f"Found one valid customer profile: {customer_id}. Selecting automatically.")
+        else:
+            print("Found multiple valid customer profiles. Please choose one:")
+            for i, (id, guid) in enumerate(valid_customers):
+                print(f"[{i + 1}] {id}")
+
+            while True:
+                try:
+                    choice = int(input("Enter your choice: "))
+                    if 1 <= choice <= len(valid_customers):
+                        customer_id = valid_customers[choice - 1][0]
+                        break
+                    else:
+                        print("Invalid choice. Please try again.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
 
     # Create config file
     config = configparser.ConfigParser()
