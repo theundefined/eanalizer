@@ -1,7 +1,7 @@
 import pandas as pd
 import holidays
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional, Tuple
 
 class TariffManager:
     def __init__(self, config_path: str, years: range):

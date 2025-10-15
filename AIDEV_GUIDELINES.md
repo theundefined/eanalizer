@@ -31,4 +31,4 @@ Po **każdej** operacji modyfikującej kod (`.py`, `.sh`) lub konfigurację, nal
 
 ## 6. Zawsze używaj skryptu opakowującego
 
-W dokumentacji i przykładach zawsze używaj skryptu `./eanalizer.sh` zamiast bezpośredniego wywołania `python -m ...`, aby zapewnić spójność i prostotę dla użytkownika.
+W dokumentacji i przykładach zawsze używaj skryptu `./eanalizer-cli` zamiast bezpośredniego wywołania `python -m ...`, aby zapewnić spójność i prostotę dla użytkownika.

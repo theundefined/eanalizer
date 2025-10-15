@@ -34,4 +34,4 @@ _eanalizer_completions()
 }
 
 # Zarejestruj funkcję uzupełniającą dla naszego skryptu
-complete -F _eanalizer_completions eanalizer.sh
+complete -F _eanalizer_completions eanalizer-cli

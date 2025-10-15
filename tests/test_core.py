@@ -1,5 +1,4 @@
 import unittest
-import pandas as pd
 import os
 import json
 from unittest.mock import patch, MagicMock
@@ -8,9 +7,6 @@ from datetime import datetime
 from eanalizer.data_loader import load_from_enea_csv
 from eanalizer.price_fetcher import get_hourly_rce_prices
 from eanalizer.core import (
-    simulate_physical_storage, 
-    calculate_optimal_capacity, 
-    aggregate_daily_data, 
     run_rce_analysis, run_analysis_with_tariffs
 )
 from eanalizer.tariffs import TariffManager
