@@ -9,14 +9,18 @@ W większości stworzona przy użyciu GEMINI
     ```bash
     sudo apt install python3.12-venv
     ```
-2.  Utwórz wirtualne środowisko (jeśli nie zrobi tego za Ciebie skrypt `eanalizer-cli` przy pierwszym uruchomieniu):
+2.  (Opcjonalnie) Skrypt `eanalizer-cli` przy pierwszym uruchomieniu automatycznie tworzy wirtualne środowisko i instaluje zależności. Poniższy krok jest przeznaczony dla deweloperów lub w przypadku manualnej instalacji:
     ```bash
     python3 -m venv .venv
     .venv/bin/pip install -e .
     ```
 
 ## Dane
-Pobierz dane w formacie CSV z https://ebok.enea.pl/meter/summaryBalancingChart - dla każdego roku osobno, umieść je w katalogu data
+
+Dane o zużyciu energii w formacie CSV można pozyskać na dwa sposoby:
+
+1.  **Manualnie**: Pobierz dane z portalu [Enea eBOK](https://ebok.enea.pl/meter/summaryBalancingChart) dla każdego roku osobno i umieść je w katalogu `data`.
+2.  **Automatycznie**: Użyj programu `enea_downloader`, który jest dostępny do pobrania na stronie z wydaniami (Releases) tego repozytorium. Program automatycznie pobierze dane po podaniu loginu i hasła do serwisu Enea.
 
 ## Użycie
 
