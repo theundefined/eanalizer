@@ -13,4 +13,6 @@ Przy pierwszym uruchomieniu, program poprosi użytkownika o podanie następując
 - Hasło
 - Identyfikator klienta (numer kontrahenta)
 
-Podane dane zostaną zapisane w pliku konfiguracyjnym `config.ini`, aby umożliwić automatyczne logowanie przy kolejnych uruchomieniach. Dzięki temu użytkownik не będzie musiał ponownie wprowadzać swoich danych uwierzytelniających.
+Program spróbuje automatycznie wybrać kontrahenta z danymi godzinowymi. Jeśli znajdzie tylko jednego, nie będzie pytał o jego identyfikator.
+
+Podane dane zostaną zapisane w pliku konfiguracyjnym `config.ini`, aby umożliwić automatyczne logowanie przy kolejnych uruchomieniach. Dzięki temu użytkownik nie będzie musiał ponownie wprowadzać swoich danych uwierzytelniających.

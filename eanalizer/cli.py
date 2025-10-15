@@ -57,7 +57,15 @@ def main():
         all_energy_data.extend(load_from_enea_csv(file_path))
     
     all_energy_data.sort(key=lambda x: x.timestamp)
-    print(f"\nŁącznie wczytano {len(all_energy_data)} rekordów.")
+    
+    if all_energy_data:
+        print(f"\nŁącznie wczytano {len(all_energy_data)} rekordów.")
+        oldest_date = all_energy_data[0].timestamp
+        newest_date = all_energy_data[-1].timestamp
+        print(f"Najstarsze dane pochodzą z: {oldest_date.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Najnowsze dane pochodzą z: {newest_date.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        print(f"\nNie wczytano żadnych rekordów.")
 
     filtered_data = filter_data_by_date(all_energy_data, args.data_start, args.data_koniec)
     
