@@ -3,11 +3,13 @@ name: Build and Release EXE
 on:
   push:
     tags:
-      - 'v*' # Uruchom tylko przy pushowaniu tagów, np. v1.0, v1.1.0
+      - 'v*'
 
 jobs:
   build-windows:
-    runs-on: windows-latest # Użyj maszyny wirtualnej z Windowsem dostarczonej przez GitHub
+    runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,7 +17,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Możesz wybrać wersję Pythona
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -28,4 +30,4 @@ jobs:
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/enea_downloader.exe # Ścieżka do zbudowanego pliku .exe
+          files: dist/enea_downloader.exe
