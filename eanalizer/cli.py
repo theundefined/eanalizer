@@ -2,10 +2,10 @@ import argparse
 import glob
 import os
 from datetime import datetime
-from .data_loader import load_from_enea_csv
-from .tariffs import TariffManager
-from .price_fetcher import get_hourly_rce_prices
-from .core import (
+from eanalizer.data_loader import load_from_enea_csv
+from eanalizer.tariffs import TariffManager
+from eanalizer.price_fetcher import get_hourly_rce_prices
+from eanalizer.core import (
     filter_data_by_date, 
     export_to_csv, 
     simulate_physical_storage,
