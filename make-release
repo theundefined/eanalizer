@@ -14,7 +14,7 @@ TAG_PREFIX="v0.${DATE_PART}"
 # Find the latest build number for today's date.
 # It lists all tags for today, extracts the build number (the part after the dot),
 # sorts them numerically in reverse order, and takes the first one (the highest).
-LATEST_BUILD_NUMBER=$(git tag -l "${TAG_PREFIX}.*" | awk -F. '{print $2}' | sort -nr | head -n 1)
+LATEST_BUILD_NUMBER=$(git tag -l "${TAG_PREFIX}.*" | awk -F. '{print $3}' | sort -nr | head -n 1)
 
 # Determine the next build number.
 if [ -z "$LATEST_BUILD_NUMBER" ]; then
