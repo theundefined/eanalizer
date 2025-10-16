@@ -30,6 +30,9 @@ jobs:
       - name: Build eanalizer executable
         run: pyinstaller --onefile --name eanalizer-cli --add-data "config;config" eanalizer/cli.py
 
+      - name: Test the executable
+        run: dist/eanalizer-cli.exe --help
+
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
