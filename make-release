@@ -9,7 +9,7 @@ git fetch --tags origin
 
 # Get the current date in YYYYMMDD format.
 DATE_PART=$(date +%Y%m%d)
-TAG_PREFIX="v${DATE_PART}"
+TAG_PREFIX="v0.${DATE_PART}"
 
 # Find the latest build number for today's date.
 # It lists all tags for today, extracts the build number (the part after the dot),
