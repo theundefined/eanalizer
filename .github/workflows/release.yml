@@ -31,6 +31,8 @@ jobs:
         run: pyinstaller --onefile --name eanalizer-cli --add-data "config;config" eanalizer/cli.py
 
       - name: Test the executable
+        env:
+          PYTHONUTF8: "1"
         run: dist/eanalizer-cli.exe --help
 
       - name: Create Release and Upload Asset
