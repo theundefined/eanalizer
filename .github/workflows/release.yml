@@ -30,10 +30,10 @@ jobs:
           pip install -e .
 
       - name: Build enea_downloader executable
-        run: pyinstaller --onefile --console --name enea_downloader --hidden-import=eanalizer enea-downloader
+        run: pyinstaller --onefile --console --name enea_downloader --hidden-import=eanalizer eanalizer/downloader_cli.py
 
       - name: Build eanalizer executable
-        run: pyinstaller --onefile --console --name eanalizer-cli --hidden-import=eanalizer eanalizer-cli
+        run: pyinstaller --onefile --console --name eanalizer-cli --hidden-import=eanalizer eanalizer/cli.py
 
       - name: Test the eanalizer executable
         env:

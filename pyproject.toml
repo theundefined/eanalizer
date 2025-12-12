@@ -1,6 +1,6 @@
 [project]
 name = "eanalizer"
-version = "0.1.1"
+version = "0.1.2"
 description = "Aplikacja do analizy zużycia energii elektrycznej z danych od operatorów (Enea, Tauron)."
 authors = [{ name = "TheUndefined", email = "kontakt@theundefined.pl" }]
 readme = "README.md"
