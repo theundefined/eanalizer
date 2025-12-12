@@ -206,7 +206,9 @@ def _prompt_for_enea_credentials() -> dict:
             return {}
 
 
-def load_config(require_credentials=False) -> AppConfig:
+def load_config(
+    require_credentials=False, prompt_for_missing=True
+) -> AppConfig:
     """
     Loads the application configuration or prompts the user to create one.
     """
@@ -217,14 +219,18 @@ def load_config(require_credentials=False) -> AppConfig:
     creds = {}
 
     if not config_file.is_file():
+        if not prompt_for_missing:
+            raise FileNotFoundError("Config file not found and prompting is disabled.")
         data_dir = _prompt_for_paths(config_file)
     else:
-        parser.read(config_file)
+        parser.read(str(config_file)) # Ensure path is a string for older python versions
         data_dir_str = parser.get("paths", "data_dir", fallback=None)
         if data_dir_str:
             data_dir = Path(data_dir_str)
-        else:
+        elif prompt_for_missing:
             data_dir = _prompt_for_paths(config_file)
+        else:
+            raise ValueError("data_dir not found in config and prompting is disabled.")
 
         creds = (
             dict(parser.items("enea_credentials"))
@@ -235,6 +241,8 @@ def load_config(require_credentials=False) -> AppConfig:
     if require_credentials and not all(
         k in creds for k in ["email", "password", "customer_id"]
     ):
+        if not prompt_for_missing:
+            raise ValueError("Credentials required but not found, and prompting is disabled.")
         print("Brakujace dane logowania Enea w pliku konfiguracyjnym.")
         new_creds = _prompt_for_enea_credentials()
         if new_creds:
