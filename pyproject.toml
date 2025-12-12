@@ -1,17 +1,40 @@
 [project]
 name = "eanalizer"
 version = "0.1.0"
-description = "Aplikacja do analizy zużycia energii elektrycznej."
-authors = [{ name = "Your Name", email = "your@email.com" }]
+description = "Aplikacja do analizy zużycia energii elektrycznej z danych od operatorów (Enea, Tauron)."
+authors = [{ name = "TheUndefined", email = "kontakt@theundefined.pl" }]
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.8"
+keywords = ["enea", "energy", "analiza", "fotowoltaika", "tauron"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
 dependencies = [
     "pandas>=2.0.0",
     "openpyxl>=3.0.0",
     "holidays>=0.40",
+    "platformdirs>=4.0.0",
+    "requests>=2.30.0",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/theundefined/eanalizer"
+"Bug Tracker" = "https://github.com/theundefined/eanalizer/issues"
 
 [project.scripts]
 eanalizer = "eanalizer.cli:main"
+enea-downloader = "eanalizer.downloader_cli:main"
 
 [tool.setuptools]
 packages = ["eanalizer"]
