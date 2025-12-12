@@ -3,35 +3,46 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-# Fetch all tags from the remote repository to ensure we have the latest information.
-echo "Fetching latest tags from origin..."
-git fetch --tags origin
-
-# Get the current date in YYYYMMDD format.
-DATE_PART=$(date +%Y%m%d)
-TAG_PREFIX="v0.${DATE_PART}"
-
-# Find the latest build number for today's date.
-# It lists all tags for today, extracts the build number (the part after the dot),
-# sorts them numerically in reverse order, and takes the first one (the highest).
-LATEST_BUILD_NUMBER=$(git tag -l "${TAG_PREFIX}.*" | awk -F. '{print $3}' | sort -nr | head -n 1)
-
-# Determine the next build number.
-if [ -z "$LATEST_BUILD_NUMBER" ]; then
-  # If no build exists for today, start with 1.
-  NEXT_BUILD_NUMBER=1
-else
-  # Otherwise, increment the latest build number.
-  NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+# Check if the working directory is clean
+if ! git diff-index --quiet HEAD --; then
+    echo "Working directory is not clean. Please commit or stash your changes."
+    exit 1
 fi
 
-# Construct the full new tag.
-NEW_TAG="${TAG_PREFIX}.${NEXT_BUILD_NUMBER}"
+echo "Pulling latest changes from origin..."
+git pull origin main
 
+# --- Version Management ---
+# Read the current version from pyproject.toml
+CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' pyproject.toml)
+echo "Current version: ${CURRENT_VERSION}"
+
+# Increment the patch version number
+IFS='.' read -r -a version_parts <<< "$CURRENT_VERSION"
+major=${version_parts[0]}
+minor=${version_parts[1]}
+patch=${version_parts[2]}
+new_patch=$((patch + 1))
+NEW_VERSION="${major}.${minor}.${new_patch}"
+echo "New version will be: ${NEW_VERSION}"
+
+# Update the version in pyproject.toml using sed
+# This is safer than rewriting the whole file
+sed -i "s/version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" pyproject.toml
+echo "Updated pyproject.toml to version ${NEW_VERSION}"
+
+# --- Git Tagging and Pushing ---
+# Commit the version bump
+git add pyproject.toml
+git commit -m "chore: bump version to ${NEW_VERSION}"
+
+# Create the new tag
+NEW_TAG="v${NEW_VERSION}"
 echo "Creating new tag: ${NEW_TAG}"
 git tag "${NEW_TAG}"
 
-echo "Pushing new tag to origin..."
+echo "Pushing commit and new tag to origin..."
+git push origin main
 git push origin "${NEW_TAG}"
 
 echo "Successfully created and pushed tag ${NEW_TAG}. The release process should now start on GitHub Actions."

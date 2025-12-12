@@ -1,43 +1,73 @@
 import unittest
 import os
 import json
+import tempfile
+import shutil
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 from eanalizer.data_loader import load_from_enea_csv
 from eanalizer.price_fetcher import get_hourly_rce_prices
-from eanalizer.core import (
-    run_rce_analysis, run_analysis_with_tariffs
-)
+from eanalizer.core import run_rce_analysis, run_analysis_with_tariffs
 from eanalizer.tariffs import TariffManager
 from eanalizer.models import EnergyData
+from eanalizer.config import AppConfig
 
 # Przykładowa odpowiedź JSON z API PSE dla jednego dnia
 FAKE_API_RESPONSE = {
     "value": [
-        {"dtime": "2024-07-01 00:15:00", "rce_pln": 400.0}, # Godzina 00:00 - średnia 400
+        {"dtime": "2024-07-01 00:15:00", "rce_pln": 400.0},
         {"dtime": "2024-07-01 00:30:00", "rce_pln": 400.0},
         {"dtime": "2024-07-01 00:45:00", "rce_pln": 400.0},
         {"dtime": "2024-07-01 01:00:00", "rce_pln": 400.0},
-        {"dtime": "2024-07-01 01:15:00", "rce_pln": 800.0}, # Godzina 01:00 - średnia 700
+        {"dtime": "2024-07-01 01:15:00", "rce_pln": 800.0},
         {"dtime": "2024-07-01 01:30:00", "rce_pln": 800.0},
         {"dtime": "2024-07-01 01:45:00", "rce_pln": 800.0},
-        {"dtime": "2024-07-01 02:00:00", "rce_pln": 800.0}
+        {"dtime": "2024-07-01 02:00:00", "rce_pln": 800.0},
     ]
 }
+
 
 class TestCoreFunctionality(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.test_data = load_from_enea_csv('tests/test_data.csv')
-        cls.tariff_manager = TariffManager('config/tariffs.csv', years=range(2024, 2025))
+        # Create a temporary directory for test configs and data
+        cls.test_dir = tempfile.mkdtemp()
+
+        # Create a dummy tariffs file
+        tariffs_path = Path(cls.test_dir) / "tariffs.csv"
+        with open(tariffs_path, "w") as f:
+            f.write("tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n")
+            f.write("G12w,wysoka,weekday,6,21,1.08\n")
+            f.write("G12w,niska,weekday,0,6,0.76\n")
+            f.write("G12w,niska,weekday,21,24,0.76\n")
+            f.write("G12w,niska,weekend,0,24,0.76\n")
+
+        # Create a test AppConfig instance
+        cls.test_config = AppConfig(
+            config_file_path=Path(cls.test_dir) / "config.ini",
+            data_dir=Path(cls.test_dir) / "data",
+            tariffs_file=tariffs_path,
+            cache_dir=Path(cls.test_dir) / "cache" / "rce_prices",
+        )
+
+        cls.tariff_manager = TariffManager(
+            str(cls.test_config.tariffs_file), years=range(2024, 2025)
+        )
+        cls.test_data = load_from_enea_csv("tests/test_data.csv")
+
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up the temporary directory
+        shutil.rmtree(cls.test_dir)
 
     def test_data_loading(self):
         self.assertEqual(len(self.test_data), 5)
         self.assertEqual(self.test_data[0].pobor_przed, 1.0)
 
-    @patch('urllib.request.urlopen')
+    @patch("urllib.request.urlopen")
     def test_rce_fetching_and_analysis(self, mock_urlopen):
         """Testuje cały proces pobierania, cachowania i analizy cen RCE."""
         mock_response = MagicMock()
@@ -45,13 +75,18 @@ class TestCoreFunctionality(unittest.TestCase):
         mock_response.read.return_value = json.dumps(FAKE_API_RESPONSE).encode()
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
-        test_date_str = '2024-07-01'
-        cache_file = f'cache/rce_prices/{test_date_str}.json'
+        test_date_str = "2024-07-01"
+        cache_file = self.test_config.cache_dir / f"{test_date_str}.json"
+
         if os.path.exists(cache_file):
             os.remove(cache_file)
 
-        prices = get_hourly_rce_prices(datetime(2024, 7, 1), datetime(2024, 7, 1))
-        
+        prices = get_hourly_rce_prices(
+            datetime(2024, 7, 1),
+            datetime(2024, 7, 1),
+            cache_dir=self.test_config.cache_dir,
+        )
+
         mock_urlopen.assert_called_once()
         self.assertTrue(os.path.exists(cache_file))
         self.assertAlmostEqual(prices[datetime(2024, 7, 1, 0, 0)], 0.4)
@@ -64,6 +99,7 @@ class TestCoreFunctionality(unittest.TestCase):
 
         import sys
         from io import StringIO
+
         original_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
         run_rce_analysis(test_energy_data, prices)
@@ -73,35 +109,36 @@ class TestCoreFunctionality(unittest.TestCase):
         self.assertIn("SUMARYCZNY KOSZT energii pobranej: 0.40 zł", output)
         self.assertIn("SUMARYCZNY PRZYCHÓD z energii oddanej: 1.75 zł", output)
 
-    # Pozostałe testy, które powinny tu być, ale zostały pominięte dla zwięzłości
-    # W pełnej wersji powinny tu być testy dla simulate_physical_storage i calculate_optimal_capacity
-
     def test_net_metering_cascade_logic(self):
         """Testuje kaskadową logikę rozliczeń net-metering między strefami."""
-        # Przygotowujemy dane testowe obejmujące dwie strefy taryfy G12w
-        # Strefa wysoka (dzień roboczy): 2024-05-02 10:00
-        # Strefa niska (święto): 2024-05-01 22:00
-        test_data = [
-            self.test_data[3], # 2024-05-02 11:59 (pobor_przed=2.5, oddanie_przed=0) -> strefa WYSOKA
-            self.test_data[2]  # 2024-05-01 22:59 (pobor_przed=2.0, oddanie_przed=0) -> strefa NISKA
-        ]
-        # Dodajemy rekord z produkcją w strefie wysokiej
-        test_data.append(EnergyData(timestamp=datetime(2024, 5, 2, 12, 0), pobor_przed=0, oddanie_przed=5.0, pobor=0, oddanie=5.0))
+        test_data = [self.test_data[3], self.test_data[2]]
+        test_data.append(
+            EnergyData(
+                timestamp=datetime(2024, 5, 2, 12, 0),
+                pobor_przed=0,
+                oddanie_przed=5.0,
+                pobor=0,
+                oddanie=5.0,
+            )
+        )
 
         import sys
         from io import StringIO
+
         original_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
 
-        # Uruchamiamy analizę z włączonym net-meteringiem (współczynnik 0.8)
-        run_analysis_with_tariffs(test_data, 'G12w', False, None, 0.8)
+        run_analysis_with_tariffs(
+            data=test_data,
+            tariff="G12w",
+            tariff_manager=self.tariff_manager,  # Pass the tariff_manager
+            should_calc_optimal_capacity=False,
+            daily_export_path=None,
+            net_metering_ratio=0.8,
+        )
         sys.stdout = original_stdout
         output = captured_output.getvalue()
 
-        # Oczekiwana logika:
-        # 1. Strefa WYSOKA: pobór=2.5, oddanie=5.0. Kredyt: 5.0*0.8=4.0. Do opłacenia: max(0, 2.5-4.0)=0. Rollover: 1.5
-        # 2. Strefa NISKA: pobór=2.0, oddanie=0. Kredyt: 0*0.8 + 1.5 (rollover) = 1.5. Do opłacenia: max(0, 2.0-1.5)=0.5
-        # Całkowity koszt: 0.5 * 0.76 (cena w strefie niskiej) = 0.38
         self.assertIn("Kredyt z poprzedniej strefy: 1.500 kWh", output)
         self.assertIn("Energia do opłacenia w strefie: 0.500 kWh", output)
         self.assertIn("SUMARYCZNY KOSZT ENERGII (po rozliczeniu): 0.38 zł", output)

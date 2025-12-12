@@ -377,11 +377,11 @@ that material) supplement the terms of this License with terms:
     authors of the material; or
 
     e) Declining to grant rights under trademark law for use of some
-    trade names, trademarks, or service marks; or
-
+    trade names, trademarks, or service marks;
     f) Requiring indemnification of licensors and authors of that
     material by anyone who conveys the material (or modified versions of
     it) with contractual assumptions of liability to the recipient, for
+
     any liability that these contractual assumptions directly impose on
     those licensors and authors.
 
@@ -672,3 +672,4 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
