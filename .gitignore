@@ -8,6 +8,11 @@ __pycache__/
 env/
 venv/
 
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
 # Pliki IDE
 .vscode/
 .idea/
@@ -17,3 +22,8 @@ data/
 
 # plik z credentalami do pobierania danych z enea
 config.ini
+
+# Gemini related files
+.gemini/
+gha-creds-*.json
+GEMINI.md

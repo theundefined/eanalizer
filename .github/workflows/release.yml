@@ -1,4 +1,4 @@
-name: Build and Release EXE
+name: Build, Publish and Release
 
 on:
   push:
@@ -6,10 +6,13 @@ on:
       - 'v*'
 
 jobs:
-  build-windows:
+  build-and-publish:
     runs-on: windows-latest
     permissions:
       contents: write
+      # This is required for PyPI publishing
+      id-token: write 
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,22 +25,35 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller requests .
+          # Install pyinstaller and project in editable mode
+          pip install pyinstaller build
+          pip install -e .
 
       - name: Build enea_downloader executable
-        run: pyinstaller --onefile --name enea_downloader enea_downloader.py
+        run: pyinstaller --onefile --name enea_downloader eanalizer/downloader_cli.py
 
       - name: Build eanalizer executable
-        run: pyinstaller --onefile --name eanalizer-cli --add-data "config;config" eanalizer/cli.py
+        run: pyinstaller --onefile --name eanalizer-cli eanalizer/cli.py
 
-      - name: Test the executable
+      - name: Test the eanalizer executable
         env:
           PYTHONUTF8: "1"
         run: dist/eanalizer-cli.exe --help
+      
+      - name: Build sdist and wheel
+        run: python -m build
 
-      - name: Create Release and Upload Asset
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # You will need to create a PYPI_API_TOKEN secret in your repository settings
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Create Release and Upload EXE Assets
         uses: softprops/action-gh-release@v2
         with:
+          # This action will create a release for the pushed tag
+          # and upload the specified files as assets.
           files: |
             dist/enea_downloader.exe
             dist/eanalizer-cli.exe
