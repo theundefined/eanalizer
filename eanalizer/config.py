@@ -68,8 +68,8 @@ def _get_config_file_path() -> Path:
 
 def _prompt_for_paths(config_file_path: Path) -> Path:
     """Prompts the user for the data directory path."""
-    print(f"Plik konfiguracyjny nie został znaleziony w: {config_file_path}")
-    print("Proszę podać ścieżkę do katalogu, w którym będą przechowywane dane.")
+    print(f"Plik konfiguracyjny nie zostal znaleziony w: {config_file_path}")
+    print("Prosze podac sciezke do katalogu, w ktorym beda przechowywane dane.")
 
     # Suggest a default data directory
     if Path.cwd().joinpath("pyproject.toml").is_file():
@@ -77,7 +77,7 @@ def _prompt_for_paths(config_file_path: Path) -> Path:
     else:
         default_data_dir = Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
 
-    print(f"Sugerowana lokalizacja (wciśnij Enter, aby użyć): {default_data_dir}")
+    print(f"Sugerowana lokalizacja (wcisnij Enter, aby uzyc): {default_data_dir}")
 
     while True:
         try:
@@ -91,14 +91,14 @@ def _prompt_for_paths(config_file_path: Path) -> Path:
             print(f"Katalog danych ustawiono na: {data_dir}")
             return data_dir
         except Exception as e:
-            print(f"Nie można utworzyć katalogu: {e}. Proszę podać inną ścieżkę.")
+            print(f"Nie mozna utworzyc katalogu: {e}. Prosze podac inna sciezke.")
 
 
 def _prompt_for_enea_credentials() -> dict:
     """Interactively prompts the user for Enea credentials and verifies them."""
-    print("\nProszę podać swoje dane logowania do https://ebok.enea.pl/logowanie")
+    print("\nProsze podac swoje dane logowania do https://ebok.enea.pl/logowanie")
     email = input("Email: ")
-    password = getpass.getpass("Hasło: ")
+    password = getpass.getpass("Haslo: ")
 
     # Verification logic copied from the original downloader
     headers = {
@@ -112,7 +112,7 @@ def _prompt_for_enea_credentials() -> dict:
             token_match = re.search(r'name="token" value="(.*?)"', login_page.text)
             if not token_match:
                 raise ConnectionError(
-                    "Błąd: Nie można znaleźć tokena CSRF na stronie logowania."
+                    "Blad: Nie mozna znalezc tokena CSRF na stronie logowania."
                 )
             token = token_match.group(1)
 
@@ -128,7 +128,7 @@ def _prompt_for_enea_credentials() -> dict:
             login_response.raise_for_status()
             if "Lista kontrahentów" not in login_response.text:
                 raise ValueError(
-                    "Logowanie nie powiodło się. Sprawdź swoje dane uwierzytelniające."
+                    "Logowanie nie powiodlo sie. Sprawdz swoje dane uwierzytelniajace."
                 )
 
             customers = re.findall(
@@ -138,10 +138,10 @@ def _prompt_for_enea_credentials() -> dict:
             )
             if not customers:
                 raise ValueError(
-                    "Błąd: Nie znaleziono profili klientów dla tego konta."
+                    "Blad: Nie znaleziono profili klientow dla tego konta."
                 )
 
-            print("Weryfikacja, które profile posiadają dane godzinowe...")
+            print("Weryfikacja, ktore profile posiadaja dane godzinowe...")
             valid_customers = []
             for id, guid in customers:
                 print(f"Sprawdzanie profilu {id}... ", end="")
@@ -169,40 +169,40 @@ def _prompt_for_enea_credentials() -> dict:
                         print("Brak danych godzinowych.")
 
                 except requests.exceptions.RequestException as e:
-                    print(f"Nie udało się zweryfikować profilu {id}: {e}")
+                    print(f"Nie udalo sie zweryfikowac profilu {id}: {e}")
 
             if not valid_customers:
                 raise ValueError(
-                    "Błąd: Nie znaleziono profili klientów z dostępnymi danymi godzinnymi dla tego konta."
+                    "Blad: Nie znaleziono profili klientow z dostepnymi danymi godzinnymi."
                 )
 
             customer_id = None
             if len(valid_customers) == 1:
                 customer_id = valid_customers[0][0]
                 print(
-                    f"Znaleziono jeden prawidłowy profil klienta: {customer_id}. Wybieram automatycznie."
+                    f"Znaleziono jeden prawidlowy profil klienta: {customer_id}. Wybieram automatycznie."
                 )
             else:
                 print(
-                    "Znaleziono wiele prawidłowych profili klientów. Proszę wybrać jeden:"
+                    "Znaleziono wiele prawidlowych profili klientow. Prosze wybrac jeden:"
                 )
                 for i, (id, guid) in enumerate(valid_customers):
                     print(f"[{i + 1}] {id}")
                 while True:
                     try:
-                        choice = int(input("Wybierz opcję: "))
+                        choice = int(input("Wybierz opcje: "))
                         if 1 <= choice <= len(valid_customers):
                             customer_id = valid_customers[choice - 1][0]
                             break
                         else:
-                            print("Nieprawidłowy wybór.")
+                            print("Nieprawidlowy wybor.")
                     except ValueError:
-                        print("Nieprawidłowe dane.")
+                        print("Nieprawidlowe dane.")
 
             return {"email": email, "password": password, "customer_id": customer_id}
 
         except (requests.exceptions.RequestException, ConnectionError, ValueError) as e:
-            print(f"Błąd podczas weryfikacji danych: {e}")
+            print(f"Blad podczas weryfikacji danych: {e}")
             return {}
 
 
@@ -235,20 +235,20 @@ def load_config(require_credentials=False) -> AppConfig:
     if require_credentials and not all(
         k in creds for k in ["email", "password", "customer_id"]
     ):
-        print("Brakujące dane logowania Enea w pliku konfiguracyjnym.")
+        print("Brakujace dane logowania Enea w pliku konfiguracyjnym.")
         new_creds = _prompt_for_enea_credentials()
         if new_creds:
             creds = new_creds
         else:
             # Failed to get credentials, exit or handle error
             raise SystemExit(
-                "Nie udało się pobrać i zweryfikować danych logowania. Koniec pracy."
+                "Nie udalo sie pobrac i zweryfikowac danych logowania. Koniec pracy."
             )
 
     # Create default tariff file if it doesn't exist in the data directory
     tariffs_file = data_dir / "tariffs.csv"
     if not tariffs_file.is_file():
-        print(f"Tworzenie domyślnego pliku taryf w: {tariffs_file}")
+        print(f"Tworzenie domyslnego pliku taryf w: {tariffs_file}")
         tariffs_file.parent.mkdir(parents=True, exist_ok=True)
         tariffs_file.write_text(
             "tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n"
