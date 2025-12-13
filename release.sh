@@ -90,13 +90,23 @@ else
     echo "Bumping $VERSION_BUMP_TYPE version: v$CURRENT_VERSION_SEMVER -> v$NEW_VERSION"
 fi
 
+# Update the version in pyproject.toml
+CURRENT_VERSION_IN_PYPROJECT=$(grep -oP 'version = "\K[^"]+' pyproject.toml)
+sed -i "s/version = \"${CURRENT_VERSION_IN_PYPROJECT}\"/version = \"${NEW_VERSION}\"/" pyproject.toml
+echo "Updated pyproject.toml to version ${NEW_VERSION}"
+
+# Commit the version bump
+git add pyproject.toml
+git commit -m "chore: bump version to ${NEW_VERSION}"
+
 # Create new tag
 NEW_TAG="v$NEW_VERSION"
 echo "Creating git tag: $NEW_TAG"
 git tag "$NEW_TAG" -m "$PROJECT_NAME Release $NEW_VERSION"
 
-# Push new tag
-echo "Pushing tag to origin..."
+# Push new tag and commit
+echo "Pushing commit and tag to origin..."
+git push origin master
 git push origin "$NEW_TAG"
 
 # Get repository owner and name
