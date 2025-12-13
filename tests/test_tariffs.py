@@ -4,7 +4,6 @@ from eanalizer.tariffs import TariffManager
 
 
 class TestTariffManager(unittest.TestCase):
-
     def setUp(self):
         """Inicjalizuje managera taryf przed każdym testem."""
         self.tariff_manager = TariffManager(

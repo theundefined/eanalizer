@@ -110,7 +110,7 @@ def run_analysis_with_tariffs(
             rollover_credit = max(0, dostepny_kredyt - total_pobrana_po)
 
             print(
-                f"Wytworzony kredyt w strefie ({int(net_metering_ratio*100)}%): {magazyn_w_strefie:.3f} kWh"
+                f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {magazyn_w_strefie:.3f} kWh"
             )
             # This line was confusing, let's show what was brought INTO this zone
             print(

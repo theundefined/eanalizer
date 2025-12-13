@@ -1,5 +1,4 @@
 # eanalizer/config.py
-
 import configparser
 import getpass
 import re
@@ -12,15 +11,15 @@ import requests
 
 APP_NAME = "eanalizer"
 CONFIG_FILE_NAME = "config.ini"
+DEFAULT_TARIFFS_FILE = "tariffs.csv"
 
 
 @dataclass
 class AppConfig:
     """Dataclass to hold all application configuration."""
 
-    config_file_path: Path
+    config_dir: Path
     data_dir: Path
-    tariffs_file: Path
     cache_dir: Path
 
     # Enea credentials can be optional
@@ -28,20 +27,34 @@ class AppConfig:
     password: Optional[str] = None
     customer_id: Optional[str] = None
 
+    @property
+    def tariffs_file(self) -> Path:
+        """Path to the tariffs CSV file."""
+        return self.config_dir / DEFAULT_TARIFFS_FILE
+
+    @property
+    def config_file(self) -> Path:
+        """Path to the main INI config file."""
+        return self.config_dir / CONFIG_FILE_NAME
+
     def __post_init__(self):
+        """Create directories if they don't exist."""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def save(self):
         """Saves the current configuration to the config file."""
         parser = configparser.ConfigParser()
-        # Read existing file to not lose other sections
-        if self.config_file_path.is_file():
-            parser.read(self.config_file_path)
+        # Read existing file to preserve other sections if they exist
+        if self.config_file.is_file():
+            parser.read(self.config_file, encoding="utf-8")
 
         if "paths" not in parser:
             parser["paths"] = {}
+        parser["paths"]["config_dir"] = str(self.config_dir)
         parser["paths"]["data_dir"] = str(self.data_dir)
+        parser["paths"]["cache_dir"] = str(self.cache_dir)
 
         if self.email and self.password and self.customer_id:
             if "enea_credentials" not in parser:
@@ -50,48 +63,70 @@ class AppConfig:
             parser["enea_credentials"]["password"] = self.password
             parser["enea_credentials"]["customer_id"] = self.customer_id
 
-        self.config_file_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.config_file_path.open("w") as f:
+        self.config_file.parent.mkdir(parents=True, exist_ok=True)
+        with self.config_file.open("w", encoding="utf-8") as f:
             parser.write(f)
 
 
-def _get_config_file_path() -> Path:
-    """Determines the correct path for the config file."""
-    # If running from source (local development), place config in project root.
-    if Path.cwd().joinpath("pyproject.toml").is_file():
-        return Path.cwd() / CONFIG_FILE_NAME
-    # Otherwise, use the standard user config directory (for pipx installation).
-    return (
-        Path(platformdirs.user_config_dir(APP_NAME, appauthor=False)) / CONFIG_FILE_NAME
-    )
+def _get_default_dir(dir_type: str) -> Path:
+    """
+    Determines the default path for app directories based on environment.
+    """
+    is_dev_env = Path.cwd().joinpath("pyproject.toml").is_file()
+
+    if dir_type == "config":
+        return (
+            Path.cwd() / "config"
+            if is_dev_env
+            else Path(platformdirs.user_config_dir(APP_NAME, appauthor=False))
+        )
+    if dir_type == "data":
+        return (
+            Path.cwd() / "data"
+            if is_dev_env
+            else Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
+        )
+    if dir_type == "cache":
+        return (
+            Path.cwd() / "cache"
+            if is_dev_env
+            else Path(platformdirs.user_cache_dir(APP_NAME, appauthor=False))
+        )
+
+    raise ValueError(f"Unknown directory type: {dir_type}")
 
 
-def _prompt_for_paths(config_file_path: Path) -> Path:
-    """Prompts the user for the data directory path."""
-    print(f"Plik konfiguracyjny nie zostal znaleziony w: {config_file_path}")
-    print("Prosze podac sciezke do katalogu, w ktorym beda przechowywane dane.")
-
-    # Suggest a default data directory
-    if Path.cwd().joinpath("pyproject.toml").is_file():
-        default_data_dir = Path.cwd() / "data"
-    else:
-        default_data_dir = Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
-
-    print(f"Sugerowana lokalizacja (wcisnij Enter, aby uzyc): {default_data_dir}")
-
+def _prompt_for_single_path(dir_type: str, description: str) -> Path:
+    """Prompts the user for a single directory path with a default."""
+    default_dir = _get_default_dir(dir_type)
     while True:
         try:
-            data_dir_str = input(f"Katalog na dane [{default_data_dir}]: ")
-            if not data_dir_str:
-                data_dir = default_data_dir
-            else:
-                data_dir = Path(data_dir_str).expanduser().resolve()
-
-            data_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Katalog danych ustawiono na: {data_dir}")
-            return data_dir
+            path_str = input(f"{description} [{default_dir}]: ")
+            path = Path(path_str) if path_str else default_dir
+            path = path.expanduser().resolve()
+            path.mkdir(parents=True, exist_ok=True)
+            print(f"Ustawiono katalog '{dir_type}' na: {path}")
+            return path
         except Exception as e:
             print(f"Nie mozna utworzyc katalogu: {e}. Prosze podac inna sciezke.")
+
+
+def _prompt_for_paths(config_file_path: Path) -> dict:
+    """Prompts the user for all required directory paths."""
+    print(
+        f"Plik konfiguracyjny nie zostal znaleziony lub jest niekompletny: {config_file_path}"
+    )
+    print("Prosze podac sciezki do katalogow aplikacji.")
+
+    config_dir = _prompt_for_single_path(
+        "config", "Katalog na konfiguracje (np. taryfy)"
+    )
+    data_dir = _prompt_for_single_path("data", "Katalog na dane od Enea")
+    cache_dir = _prompt_for_single_path(
+        "cache", "Katalog na pamiec podreczna (np. ceny RCE)"
+    )
+
+    return {"config_dir": config_dir, "data_dir": data_dir, "cache_dir": cache_dir}
 
 
 def _prompt_for_enea_credentials() -> dict:
@@ -100,7 +135,6 @@ def _prompt_for_enea_credentials() -> dict:
     email = input("Email: ")
     password = getpass.getpass("Haslo: ")
 
-    # Verification logic copied from the original downloader
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
         "Referer": "https://ebok.enea.pl/logowanie",
@@ -146,28 +180,23 @@ def _prompt_for_enea_credentials() -> dict:
             for id, guid in customers:
                 print(f"Sprawdzanie profilu {id}... ", end="")
                 try:
-                    # Select the client to set the context
                     headers["Referer"] = "https://ebok.enea.pl/dashboard/many-clients"
-                    client_selection_url = (
-                        f"https://ebok.enea.pl/dashboard/select-current-client/{guid}"
+                    client_response = session.get(
+                        f"https://ebok.enea.pl/dashboard/select-current-client/{guid}",
+                        headers=headers,
                     )
-                    client_response = session.get(client_selection_url, headers=headers)
                     client_response.raise_for_status()
-
-                    # Check the summary balancing chart page for the required data
                     headers["Referer"] = "https://ebok.enea.pl/dashboard"
                     summary_page = session.get(
                         "https://ebok.enea.pl/meter/summaryBalancingChart",
                         headers=headers,
                     )
                     summary_page.raise_for_status()
-
                     if 'data-point-of-delivery-id="' in summary_page.text:
                         valid_customers.append((id, guid))
                         print("OK")
                     else:
                         print("Brak danych godzinowych.")
-
                 except requests.exceptions.RequestException as e:
                     print(f"Nie udalo sie zweryfikowac profilu {id}: {e}")
 
@@ -198,96 +227,73 @@ def _prompt_for_enea_credentials() -> dict:
                             print("Nieprawidlowy wybor.")
                     except ValueError:
                         print("Nieprawidlowe dane.")
-
             return {"email": email, "password": password, "customer_id": customer_id}
-
-        except (requests.exceptions.RequestException, ConnectionError, ValueError) as e:
-            print(f"Blad podczas weryfikacji danych: {e}")
-            return {}
+        except (requests.exceptions.RequestException, ValueError, ConnectionError) as e:
+            print(f"Blad podczas weryfikacji: {e}")
+            raise SystemExit(1)
 
 
 def load_config(
-    require_credentials=False, prompt_for_missing=True
+    require_credentials: bool = False, prompt_for_missing: bool = True
 ) -> AppConfig:
-    """
-    Loads the application configuration or prompts the user to create one.
-    """
-    config_file = _get_config_file_path()
+    """Loads application config, prompting if missing/incomplete."""
+    initial_config_dir = _get_default_dir("config")
+    config_file = initial_config_dir / CONFIG_FILE_NAME
     parser = configparser.ConfigParser()
 
-    data_dir = None
+    paths = {}
     creds = {}
 
-    if not config_file.is_file():
-        if not prompt_for_missing:
-            raise FileNotFoundError("Config file not found and prompting is disabled.")
-        data_dir = _prompt_for_paths(config_file)
-    else:
-        parser.read(str(config_file)) # Ensure path is a string for older python versions
-        data_dir_str = parser.get("paths", "data_dir", fallback=None)
-        if data_dir_str:
-            data_dir = Path(data_dir_str)
-        elif prompt_for_missing:
-            data_dir = _prompt_for_paths(config_file)
-        else:
-            raise ValueError("data_dir not found in config and prompting is disabled.")
+    config_is_valid = False
+    if config_file.is_file():
+        parser.read(str(config_file), encoding="utf-8")
+        if parser.has_section("paths"):
+            required_paths = ["config_dir", "data_dir", "cache_dir"]
+            if all(parser.has_option("paths", p) for p in required_paths):
+                paths = {p: Path(parser.get("paths", p)) for p in required_paths}
+                config_is_valid = True
+        if parser.has_section("enea_credentials"):
+            creds = dict(parser.items("enea_credentials"))
 
-        creds = (
-            dict(parser.items("enea_credentials"))
-            if parser.has_section("enea_credentials")
-            else {}
-        )
+    if not config_is_valid:
+        if not prompt_for_missing:
+            raise FileNotFoundError(
+                f"Plik konfiguracyjny nie istnieje lub jest niekompletny: {config_file}"
+            )
+        paths = _prompt_for_paths(config_file)
 
     if require_credentials and not all(
         k in creds for k in ["email", "password", "customer_id"]
     ):
         if not prompt_for_missing:
-            raise ValueError("Credentials required but not found, and prompting is disabled.")
-        print("Brakujace dane logowania Enea w pliku konfiguracyjnym.")
-        new_creds = _prompt_for_enea_credentials()
-        if new_creds:
-            creds = new_creds
-        else:
-            # Failed to get credentials, exit or handle error
-            raise SystemExit(
-                "Nie udalo sie pobrac i zweryfikowac danych logowania. Koniec pracy."
-            )
-
-    # Create default tariff file if it doesn't exist in the data directory
-    tariffs_file = data_dir / "tariffs.csv"
-    if not tariffs_file.is_file():
-        print(f"Tworzenie domyslnego pliku taryf w: {tariffs_file}")
-        tariffs_file.parent.mkdir(parents=True, exist_ok=True)
-        tariffs_file.write_text(
-            "tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n"
-            "G11,stala,all,0,24,0.97\n"
-            "G12,wysoka,all,6,13,1.06\n"
-            "G12,wysoka,all,15,22,1.06\n"
-            "G12,niska,all,0,6,0.75\n"
-            "G12,niska,all,13,15,0.75\n"
-            "G12,niska,all,22,24,0.75\n"
-            "G12w,wysoka,weekday,6,21,1.08\n"
-            "G12w,niska,weekday,0,6,0.76\n"
-            "G12w,niska,weekday,21,24,0.76\n"
-            "G12w,niska,weekend,0,24,0.76\n"
-        )
+            raise ValueError("Brakujące dane uwierzytelniające Enea.")
+        print("Brak zapisanych danych logowania Enea lub są one niekompletne.")
+        creds = _prompt_for_enea_credentials()
 
     app_cfg = AppConfig(
-        config_file_path=config_file,
-        data_dir=data_dir,
-        tariffs_file=tariffs_file,
-        cache_dir=data_dir / "cache" / "rce_prices",
+        config_dir=paths["config_dir"],
+        data_dir=paths["data_dir"],
+        cache_dir=paths["cache_dir"],
         email=creds.get("email"),
         password=creds.get("password"),
         customer_id=creds.get("customer_id"),
     )
 
-    app_cfg.save()  # Save any changes (new paths or credentials)
+    if not app_cfg.tariffs_file.is_file():
+        print(f"Tworzenie domyslnego pliku taryf w: {app_cfg.tariffs_file}")
+        default_tariffs_content = (
+            "tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n"
+            "G11,stala,all,0,24,0.97\n"
+            "G12,tansza,weekday,22,6,0.72\n"
+            "G12,drozsza,weekday,6,22,1.15\n"
+            "G12,tansza,weekend,0,24,0.72\n"
+            "G12w,tansza,weekday,22,6,0.72\n"
+            "G12w,drozsza,weekday,6,22,1.15\n"
+            "G12w,stala,weekend,0,24,0.72\n"
+        )
+        app_cfg.tariffs_file.write_text(
+            default_tariffs_content.replace("\\n", "\n"), encoding="utf-8"
+        )
+
+    app_cfg.save()
     return app_cfg
-
-
-# A global config instance can still be useful for simple access,
-# but now it must be loaded explicitly by each entry point.
-# For example, in cli.py: `app_config = load_config()`
-# This avoids running I/O on module import.
-# The old `app_config = load_or_create_config()` is removed.

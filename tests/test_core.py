@@ -30,14 +30,22 @@ FAKE_API_RESPONSE = {
 
 
 class TestCoreFunctionality(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
-        # Create a temporary directory for test configs and data
-        cls.test_dir = tempfile.mkdtemp()
+        # Create a temporary directory to hold all test-related subdirectories
+        cls.test_base_dir = tempfile.mkdtemp()
 
-        # Create a dummy tariffs file
-        tariffs_path = Path(cls.test_dir) / "tariffs.csv"
+        # Create specific directories for config, data, and cache
+        cls.config_dir = Path(cls.test_base_dir) / "config"
+        cls.data_dir = Path(cls.test_base_dir) / "data"
+        cls.cache_dir = Path(cls.test_base_dir) / "cache"
+
+        cls.config_dir.mkdir()
+        cls.data_dir.mkdir()
+        cls.cache_dir.mkdir()
+
+        # Create a dummy tariffs file inside the temporary config directory
+        tariffs_path = cls.config_dir / "tariffs.csv"
         with open(tariffs_path, "w") as f:
             f.write("tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n")
             f.write("G12w,wysoka,weekday,6,21,1.08\n")
@@ -45,12 +53,11 @@ class TestCoreFunctionality(unittest.TestCase):
             f.write("G12w,niska,weekday,21,24,0.76\n")
             f.write("G12w,niska,weekend,0,24,0.76\n")
 
-        # Create a test AppConfig instance
+        # Create a test AppConfig instance with the new structure
         cls.test_config = AppConfig(
-            config_file_path=Path(cls.test_dir) / "config.ini",
-            data_dir=Path(cls.test_dir) / "data",
-            tariffs_file=tariffs_path,
-            cache_dir=Path(cls.test_dir) / "cache" / "rce_prices",
+            config_dir=cls.config_dir,
+            data_dir=cls.data_dir,
+            cache_dir=cls.cache_dir,
         )
 
         cls.tariff_manager = TariffManager(
@@ -60,8 +67,8 @@ class TestCoreFunctionality(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Clean up the temporary directory
-        shutil.rmtree(cls.test_dir)
+        # Clean up the base temporary directory
+        shutil.rmtree(cls.test_base_dir)
 
     def test_data_loading(self):
         self.assertEqual(len(self.test_data), 5)

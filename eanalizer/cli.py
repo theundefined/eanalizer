@@ -1,7 +1,6 @@
 import argparse
 import glob
 import os
-from datetime import datetime
 
 from .data_loader import load_from_enea_csv
 from .tariffs import TariffManager
@@ -21,21 +20,19 @@ def main():
     """Glowna funkcja uruchomieniowa dla CLI."""
     parser = argparse.ArgumentParser(description="Analizator danych energetycznych.")
 
-    try:
-        temp_cfg = load_config(prompt_for_missing=False)
-        default_data_dir = str(temp_cfg.data_dir)
-    except (FileNotFoundError, ValueError):
-        default_data_dir = "data"
-
-    group = parser.add_mutually_exclusive_group(required=True)
+    # Grupa argumentow wykluczajacych sie: albo pliki, albo katalog
+    group = parser.add_mutually_exclusive_group()
     group.add_argument(
-        "-p", "--pliki", nargs="+", help="Lista plikow z danymi do analizy."
+        "-p",
+        "--pliki",
+        nargs="+",
+        help="Lista pojedynczych plikow z danymi do analizy.",
     )
     group.add_argument(
         "-k",
         "--katalog",
         default=None,
-        help=f"Sciezka do katalogu z plikami .csv (domyslnie: {default_data_dir}).",
+        help="Sciezka do katalogu z plikami .csv. Nadpisuje sciezke z konfiguracji.",
     )
 
     parser.add_argument(
@@ -89,19 +86,23 @@ def main():
 
     args = parser.parse_args()
 
+    # Wczytaj konfiguracje aplikacji. Jesli nie istnieje, uzytkownik zostanie
+    # poproszony o jej utworzenie.
     app_cfg = load_config()
-
-    katalog = args.katalog if args.katalog is not None else str(app_cfg.data_dir)
 
     files_to_process = []
     if args.pliki:
         files_to_process = args.pliki
-    elif katalog:
+    else:
+        # Uzyj katalogu podanego w argumencie lub tego z konfiguracji
+        katalog = args.katalog if args.katalog is not None else str(app_cfg.data_dir)
         path = os.path.join(katalog, "*.csv")
         files_to_process = sorted(glob.glob(path))
 
     if not files_to_process:
-        print(f"Nie znaleziono plikow .csv w katalogu: {katalog}")
+        katalog_info = args.katalog if args.katalog is not None else app_cfg.data_dir
+        print(f"Nie znaleziono plikow .csv do przetworzenia w: {katalog_info}")
+        print("Uruchom 'enea-downloader-cli', aby pobrac dane.")
         return
 
     print(f"Znaleziono {len(files_to_process)} plikow do przetworzenia:")
@@ -121,11 +122,10 @@ def main():
         print(
             f"Najstarsze dane pochodza z: {oldest_date.strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        print(
-            f"Najnowsze dane pochodza z: {newest_date.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
+        print(f"Najnowsze dane pochodza z: {newest_date.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
         print("\nNie wczytano zadnych rekordow.")
+        return
 
     filtered_data = filter_data_by_date(
         all_energy_data, args.data_start, args.data_koniec
@@ -138,16 +138,9 @@ def main():
     if args.data_start or args.data_koniec:
         find_missing_hours(filtered_data, args.data_start, args.data_koniec)
 
-    min_year = (
-        min(d.timestamp.year for d in filtered_data)
-        if filtered_data
-        else datetime.now().year
-    )
-    max_year = (
-        max(d.timestamp.year for d in filtered_data)
-        if filtered_data
-        else datetime.now().year
-    )
+    min_year = min(d.timestamp.year for d in filtered_data)
+    max_year = max(d.timestamp.year for d in filtered_data)
+
     tariff_manager = TariffManager(
         str(app_cfg.tariffs_file), years=range(min_year, max_year + 1)
     )
@@ -182,7 +175,7 @@ def main():
             print(f"Energia oddana do sieci:  {stats['oddanie_do_sieci']:.3f} kWh")
             if net_metering_ratio is not None:
                 print(
-                    f"Wytworzony kredyt w strefie ({int(net_metering_ratio*100)}%): {stats.get('magazyn_w_strefie', 0):.3f} kWh"
+                    f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {stats.get('magazyn_w_strefie', 0):.3f} kWh"
                 )
                 print(
                     f"Kredyt z poprzedniej strefy: {stats.get('kredyt_z_poprzedniej', 0):.3f} kWh"
@@ -218,6 +211,7 @@ def main():
             daily_export_path=args.eksport_dzienny,
             net_metering_ratio=net_metering_ratio,
         )
+
 
 if __name__ == "__main__":
     main()
