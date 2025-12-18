@@ -12,6 +12,7 @@ from .core import (
     run_analysis_with_tariffs,
     run_rce_analysis,
     find_missing_hours,
+    run_tariff_comparison,
 )
 from .config import load_config
 
@@ -83,6 +84,17 @@ def main():
         choices=[0.7, 0.8],
         help="Wspolczynnik dla energii oddawanej w net-meteringu (domyslnie: 0.8).",
     )
+    parser.add_argument(
+        "--porownaj-taryfy",
+        action="store_true",
+        help="Uruchamia porównanie wszystkich dostępnych taryf dla zadanego okresu.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Włącza tryb szczegółowy dla porównania taryf.",
+    )
 
     args = parser.parse_args()
 
@@ -145,7 +157,17 @@ def main():
         str(app_cfg.tariffs_file), years=range(min_year, max_year + 1)
     )
 
-    if args.z_cenami_rce:
+    if args.porownaj_taryfy:
+        net_metering_ratio = (
+            args.wspolczynnik_netmetering if args.z_netmetering else None
+        )
+        run_tariff_comparison(
+            data=filtered_data,
+            tariff_manager=tariff_manager,
+            net_metering_ratio=net_metering_ratio,
+            verbose=args.verbose,
+        )
+    elif args.z_cenami_rce:
         start_date = filtered_data[0].timestamp
         end_date = filtered_data[-1].timestamp
         hourly_prices = get_hourly_rce_prices(

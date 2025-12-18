@@ -62,29 +62,43 @@ def filter_data_by_date(
 def run_analysis_with_tariffs(
     data: List[EnergyData],
     tariff: str,
-    tariff_manager: TariffManager,  # Accept a TariffManager instance
+    tariff_manager: TariffManager,
     should_calc_optimal_capacity: bool,
     daily_export_path: Optional[str],
     net_metering_ratio: Optional[float],
-):
-    """Analyzes data based on a given tariff using a provided TariffManager."""
+    suppress_print: bool = False,
+) -> Optional[float]:
+    """
+    Analyzes data based on a given tariff, optionally suppressing print output
+    and returning the total cost.
+    """
     if not data:
-        print("Brak danych do analizy.")
-        return
+        if not suppress_print:
+            print("Brak danych do analizy.")
+        return None
 
-    # tariff_manager is now passed in, so we don't create it here.
+    num_months = (
+        (data[-1].timestamp.year - data[0].timestamp.year) * 12
+        + (data[-1].timestamp.month - data[0].timestamp.month)
+        + 1
+    )
+
     zoned_data_raw: Dict[str, List[EnergyData]] = {}
     zone_prices: Dict[str, float] = {}
     for record in data:
-        zone, price = tariff_manager.get_zone_and_price(record.timestamp, tariff)
+        zone, energy_price, dist_price = tariff_manager.get_zone_and_price(
+            record.timestamp, tariff
+        )
         if zone:
+            price = energy_price + dist_price
             if zone not in zoned_data_raw:
                 zoned_data_raw[zone] = []
                 zone_prices[zone] = price
             zoned_data_raw[zone].append(record)
 
     sorted_zones = sorted(zone_prices, key=zone_prices.get, reverse=True)
-    print("\n--- Analiza zużycia i kosztów (ceny stałe z taryfy) ---")
+    if not suppress_print:
+        print("\n--- Analiza zużycia i kosztów (ceny stałe z taryfy) ---")
 
     rollover_credit = 0.0
     total_cost = 0.0
@@ -92,13 +106,15 @@ def run_analysis_with_tariffs(
     for zone in sorted_zones:
         zone_data = zoned_data_raw.get(zone, [])
         price = zone_prices.get(zone, 0.0)
-        print(f"\n--- STREFA: {zone.upper()} (cena: {price:.2f} zł/kWh) ---")
+        if not suppress_print:
+            print(f"\n--- STREFA: {zone.upper()} (cena: {price:.2f} zł/kWh) ---")
 
         total_pobrana_po = sum(d.pobor for d in zone_data)
         total_oddana_po = sum(d.oddanie for d in zone_data)
 
-        print(f"Energia pobrana (po bilansowaniu): {total_pobrana_po:.3f} kWh")
-        print(f"Energia oddana (po bilansowaniu):  {total_oddana_po:.3f} kWh")
+        if not suppress_print:
+            print(f"Energia pobrana (po bilansowaniu): {total_pobrana_po:.3f} kWh")
+            print(f"Energia oddana (po bilansowaniu):  {total_oddana_po:.3f} kWh")
 
         if net_metering_ratio is not None:
             magazyn_w_strefie = total_oddana_po * net_metering_ratio
@@ -106,38 +122,101 @@ def run_analysis_with_tariffs(
             energia_do_oplacenia = max(0, total_pobrana_po - dostepny_kredyt)
             koszt_strefy = energia_do_oplacenia * price
             total_cost += koszt_strefy
-            # The rollover credit to be passed to the NEXT zone is what's left from the CURRENT zone's available credit
             rollover_credit = max(0, dostepny_kredyt - total_pobrana_po)
 
-            print(
-                f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {magazyn_w_strefie:.3f} kWh"
-            )
-            # This line was confusing, let's show what was brought INTO this zone
-            print(
-                f"Kredyt z poprzedniej strefy: {dostepny_kredyt - magazyn_w_strefie:.3f} kWh"
-            )
-            print(
-                f"Energia do opłacenia w strefie: {energia_do_oplacenia:.3f} kWh (koszt: {koszt_strefy:.2f} zł)"
-            )
+            if not suppress_print:
+                print(
+                    f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {magazyn_w_strefie:.3f} kWh"
+                )
+                print(
+                    f"Kredyt z poprzedniej strefy: {dostepny_kredyt - magazyn_w_strefie:.3f} kWh"
+                )
+                print(
+                    f"Energia do opłacenia w strefie: {energia_do_oplacenia:.3f} kWh (koszt: {koszt_strefy:.2f} zł)"
+                )
         else:
             koszt_strefy = total_pobrana_po * price
             total_cost += koszt_strefy
-            print(f"Koszt energii pobranej: {koszt_strefy:.2f} zł")
+            if not suppress_print:
+                print(f"Koszt energii pobranej: {koszt_strefy:.2f} zł")
 
-    print("\n-----------------------------------------------------")
-    print(f"SUMARYCZNY KOSZT ENERGII (po rozliczeniu): {total_cost:.2f} zł")
-    if net_metering_ratio is not None:
-        print(f"Niewykorzystany kredyt na koniec okresu: {rollover_credit:.3f} kWh")
-    print("-----------------------------------------------------")
+    fixed_fee = tariff_manager.get_fixed_fee(tariff) * num_months
+    total_cost += fixed_fee
 
-    daily_data_df = aggregate_daily_data(data)
-    analyze_daily_trends(daily_data_df)
+    if not suppress_print:
+        print("\n-----------------------------------------------------")
+        print(f"OPLATY STALE ({num_months} mies.): {fixed_fee:.2f} zł")
+        print(f"SUMARYCZNY KOSZT (po rozliczeniu): {total_cost:.2f} zł")
+        if net_metering_ratio is not None:
+            print(
+                f"Niewykorzystany kredyt na koniec okresu: {rollover_credit:.3f} kWh"
+            )
+        print("-----------------------------------------------------")
 
-    if should_calc_optimal_capacity:
-        calculate_optimal_capacity(data, daily_data_df, tariff_manager, tariff)
+        daily_data_df = aggregate_daily_data(data)
+        analyze_daily_trends(daily_data_df)
 
-    if daily_export_path:
-        export_to_csv(daily_data_df, daily_export_path)
+        if should_calc_optimal_capacity:
+            calculate_optimal_capacity(data, daily_data_df, tariff_manager, tariff)
+
+        if daily_export_path:
+            export_to_csv(daily_data_df, daily_export_path)
+
+    return total_cost
+
+
+def run_tariff_comparison(
+    data: List[EnergyData],
+    tariff_manager: TariffManager,
+    net_metering_ratio: Optional[float],
+    verbose: bool = False,
+):
+    """Calculates and prints the cost for all available tariffs."""
+    all_tariffs = tariff_manager.get_all_tariffs()
+    results = {}
+    print("\n--- Porównanie taryf ---")
+    if verbose:
+        print("Tryb szczegółowy włączony. Pokazywanie pełnej analizy dla każdej taryfy.")
+
+    for tariff in all_tariffs:
+        if verbose:
+            print(f"\n{'='*20} ANALIZA DLA TARYFY: {tariff.upper()} {'='*20}")
+        cost = run_analysis_with_tariffs(
+            data=data,
+            tariff=tariff,
+            tariff_manager=tariff_manager,
+            should_calc_optimal_capacity=False,
+            daily_export_path=None,
+            net_metering_ratio=net_metering_ratio,
+            suppress_print=not verbose,
+        )
+        if cost is not None:
+            results[tariff] = cost
+
+    # Sort results by cost
+    sorted_results = sorted(results.items(), key=lambda item: item[1])
+
+    if verbose:
+        print(f"\n{'='*20} PODSUMOWANIE PORÓWNANIA {'='*20}")
+    print(
+        f"Analiza dla okresu od {data[0].timestamp.date()} do {data[-1].timestamp.date()}"
+    )
+    if net_metering_ratio:
+        print(f"Uwzględniono net-metering ze współczynnikiem {net_metering_ratio}")
+    print("---------------------------------------------")
+    for tariff, cost in sorted_results:
+        print(f"Taryfa {tariff:<5}: {cost:>10.2f} zł")
+    print("---------------------------------------------")
+
+    if sorted_results:
+        best_tariff, best_cost = sorted_results[0]
+        print(
+            f"\nNajkorzystniejsza taryfa w tym okresie: {best_tariff} ({best_cost:.2f} zł)"
+        )
+    else:
+        print("Nie udało się obliczyć kosztów dla żadnej taryfy.")
+
+    return results
 
 
 def simulate_physical_storage(
@@ -149,6 +228,12 @@ def simulate_physical_storage(
 ) -> Tuple[Dict[str, Any], pd.DataFrame]:
     if not data:
         return {}, pd.DataFrame()
+
+    num_months = (
+        (data[-1].timestamp.year - data[0].timestamp.year) * 12
+        + (data[-1].timestamp.month - data[0].timestamp.month)
+        + 1
+    )
 
     stan_magazynu = 0.0
     wyniki_symulacji = []
@@ -176,8 +261,11 @@ def simulate_physical_storage(
             stan_magazynu -= do_rozladowania
             pobor_z_sieci = niedobor - do_rozladowania
 
-        zone, price = tariff_manager.get_zone_and_price(rekord.timestamp, tariff)
+        zone, energy_price, dist_price = tariff_manager.get_zone_and_price(
+            rekord.timestamp, tariff
+        )
         if zone:
+            price = energy_price + dist_price
             if zone not in stats["strefy"]:
                 stats["strefy"][zone] = {
                     "pobor_z_sieci": 0,
@@ -236,6 +324,12 @@ def simulate_physical_storage(
         stats["calkowity_koszt"] = sum(
             zone_stats["koszt_poboru"] for zone_stats in stats["strefy"].values()
         )
+
+    fixed_fee = tariff_manager.get_fixed_fee(tariff) * num_months
+    stats["oplaty_stale"] = fixed_fee
+    if "calkowity_koszt" in stats:
+        stats["calkowity_koszt"] += fixed_fee
+
 
     oryginalny_pobor = sum(d.pobor_przed for d in data)
     calkowity_pobor_z_sieci = sum(
@@ -299,7 +393,7 @@ def calculate_optimal_capacity(
     capacity_for_import_days = 0
     if not net_import_days.empty:
         hourly_df["zone"] = hourly_df["timestamp"].apply(
-            lambda ts: tariff_manager.get_zone_and_price(ts, tariff)[0]
+            lambda ts: tariff_manager.get_zone_and_price(ts, tariff)[0] or "poza strefa"
         )
         pobor_w_strefie_wysokiej = (
             hourly_df[
