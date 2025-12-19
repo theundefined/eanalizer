@@ -53,9 +53,7 @@ class TestCoreFunctionality(unittest.TestCase):
         # Create a dummy tariffs file inside the temporary config directory
         tariffs_path = cls.config_dir / "tariffs.csv"
         with open(tariffs_path, "w") as f:
-            f.write(
-                "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
-            )
+            f.write("tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n")
             f.write("G12w,szczytowa,weekday,6,21,0.78,0.30,10.0\n")
             f.write("G12w,pozaszczytowa,weekday,0,6,0.46,0.30,10.0\n")
             f.write("G12w,pozaszczytowa,weekday,21,24,0.46,0.30,10.0\n")
@@ -68,9 +66,7 @@ class TestCoreFunctionality(unittest.TestCase):
             cache_dir=cls.cache_dir,
         )
 
-        cls.tariff_manager = TariffManager(
-            str(cls.test_config.tariffs_file), years=range(2024, 2025)
-        )
+        cls.tariff_manager = TariffManager(str(cls.test_config.tariffs_file), years=range(2024, 2025))
         cls.test_data = load_from_enea_csv("tests/test_data.csv")
 
     @classmethod

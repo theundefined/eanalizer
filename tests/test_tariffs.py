@@ -41,44 +41,30 @@ class TestTariffManager(unittest.TestCase):
     def test_g12_tariff_zones(self):
         """Test dla taryfy G12 - strefy dzienna i nocna."""
         # Nocna (4:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 2, 4, 0), "G12"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 2, 4, 0), "G12")
         self.assertEqual(zone, "nocna")
         # Dzienna (14:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 2, 14, 0), "G12"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 2, 14, 0), "G12")
         self.assertEqual(zone, "dzienna")
         # Nocna (23:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 2, 23, 0), "G12"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 2, 23, 0), "G12")
         self.assertEqual(zone, "nocna")
 
     def test_g12w_tariff_zones(self):
         """Test dla taryfy G12w - uwzględnienie dni roboczych, weekendów i świąt."""
         # Dzień roboczy (wtorek) - szczyt (10:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 2, 10, 0), "G12w"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 2, 10, 0), "G12w")
         self.assertEqual(zone, "szczytowa")
         # Dzień roboczy (wtorek) - pozaszczyt (23:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 2, 23, 0), "G12w"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 2, 23, 0), "G12w")
         self.assertEqual(zone, "pozaszczytowa")
 
         # Weekend (sobota) - pozaszczyt (10:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 4, 6, 10, 0), "G12w"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 4, 6, 10, 0), "G12w")
         self.assertEqual(zone, "pozaszczytowa")
 
         # Święto (1 maja, czwartek) - pozaszczyt (10:00)
-        zone, _, _ = self.tariff_manager.get_zone_and_price(
-            datetime(2025, 5, 1, 10, 0), "G12w"
-        )
+        zone, _, _ = self.tariff_manager.get_zone_and_price(datetime(2025, 5, 1, 10, 0), "G12w")
         self.assertEqual(zone, "pozaszczytowa")
 
     def test_get_fixed_fee(self):
@@ -90,9 +76,7 @@ class TestTariffManager(unittest.TestCase):
 
     def test_get_all_tariffs(self):
         """Testuje pobieranie listy wszystkich taryf."""
-        self.assertEqual(
-            set(self.tariff_manager.get_all_tariffs()), {"G11", "G12", "G12w"}
-        )
+        self.assertEqual(set(self.tariff_manager.get_all_tariffs()), {"G11", "G12", "G12w"})
 
 
 if __name__ == "__main__":

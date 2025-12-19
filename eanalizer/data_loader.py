@@ -16,12 +16,8 @@ def load_from_enea_csv(file_path: str) -> List[EnergyData]:
         # Definiujemy nazwy wszystkich interesujących nas kolumn
         pobor_przed_col = "Wolumen energii elektrycznej pobranej z sieci przed bilansowaniem godzinowym"
         oddanie_przed_col = "Wolumen energii elektrycznej oddanej do sieci przed bilansowaniem godzinowym"
-        pobor_po_col = (
-            "Wolumen energii elektrycznej pobranej z sieci po bilansowaniu godzinowym"
-        )
-        oddanie_po_col = (
-            "Wolumen energii elektrycznej oddanej do sieci po bilansowaniu godzinowym"
-        )
+        pobor_po_col = "Wolumen energii elektrycznej pobranej z sieci po bilansowaniu godzinowym"
+        oddanie_po_col = "Wolumen energii elektrycznej oddanej do sieci po bilansowaniu godzinowym"
 
         df = pd.read_csv(
             file_like_object,
@@ -69,9 +65,7 @@ def load_from_enea_csv(file_path: str) -> List[EnergyData]:
             for row in df.itertuples()
         ]
 
-        print(
-            f"Pomyślnie wczytano {len(energy_data_list)} rekordów z pliku: {file_path}"
-        )
+        print(f"Pomyślnie wczytano {len(energy_data_list)} rekordów z pliku: {file_path}")
         return energy_data_list
 
     except FileNotFoundError:

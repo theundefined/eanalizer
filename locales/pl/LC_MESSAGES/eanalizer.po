@@ -1,0 +1,107 @@
+# Polish translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-12-19 21:51+0100\n"
+"PO-Revision-Date: 2025-12-19 21:56+0100\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: pl <LL@li.org>\n"
+"Language: pl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: eanalizer/cli.py:54
+msgid "Energy data analyzer."
+msgstr "Analizator danych energetycznych."
+
+#: eanalizer/cli.py:61
+msgid "List of single data files to analyze."
+msgstr "Lista pojedynczych plikow z danymi do analizy."
+
+#: eanalizer/cli.py:67
+msgid "Path to the directory with .csv files."
+msgstr "Sciezka do katalogu z plikami .csv."
+
+#: eanalizer/cli.py:74
+msgid "Specifies the energy tariff for a single analysis (default: G11)."
+msgstr "Okresla taryfe energetyczna dla pojedynczej analizy (domyslnie: G11)."
+
+#: eanalizer/cli.py:77
+msgid "Start date of the analysis (format YYYY-MM-DD)."
+msgstr "Data poczatkowa analizy (format RRRR-MM-DD)."
+
+#: eanalizer/cli.py:80
+msgid "End date of the analysis (format YYYY-MM-DD)."
+msgstr "Data koncowa analizy (format RRRR-MM-DD)."
+
+#: eanalizer/cli.py:85
+msgid "Capacity of the physical storage in kWh (e.g., 10.0)."
+msgstr "Pojemnosc fizycznego magazynu w kWh (np. 10.0)."
+
+#: eanalizer/cli.py:92
+#, python-format
+msgid ""
+"Efficiency of the physical storage (round-trip, default: 0.90, i.e., 90%%)."
+msgstr ""
+"Sprawność magazynu fizycznego (round-trip, domyslnie: 0.90, czyli 90%%)."
+
+#: eanalizer/cli.py:97
+msgid "Path to the CSV file with hourly simulation results."
+msgstr "Sciezka do pliku CSV z wynikami symulacji godzinowej."
+
+#: eanalizer/cli.py:101
+msgid "Path to the CSV file with aggregated daily data."
+msgstr "Sciezka do pliku CSV z zagregowanymi danymi dziennymi."
+
+#: eanalizer/cli.py:106
+msgid "Calculates the optimal storage capacity."
+msgstr "Oblicza optymalna pojemnosc magazynu."
+
+#: eanalizer/cli.py:111
+msgid "Use real RCE prices instead of fixed tariff prices."
+msgstr "Uzyj rzeczywistych cen RCE zamiast stalych cen taryfowych."
+
+#: eanalizer/cli.py:116
+msgid "Enables calculations for the virtual net-metering storage."
+msgstr "Wlacza obliczenia dla wirtualnego magazynu net-metering."
+
+#: eanalizer/cli.py:123
+msgid "Coefficient for energy returned in net-metering (default: 0.8)."
+msgstr "Wspolczynnik dla energii oddawanej w net-meteringu (domyslnie: 0.8)."
+
+#: eanalizer/cli.py:128
+msgid "Runs a comparison of all available tariffs for the given period."
+msgstr "Uruchamia porównanie wszystkich dostępnych taryf dla zadanego okresu."
+
+#: eanalizer/cli.py:134
+msgid "Enables verbose mode for tariff comparison."
+msgstr "Włącza tryb szczegółowy dla porównania taryf."
+
+#: eanalizer/cli.py:151
+#, python-brace-format
+msgid "No .csv files found for processing in: {}"
+msgstr "Nie znaleziono plikow .csv do przetworzenia w: {}"
+
+#: eanalizer/cli.py:154
+#, python-brace-format
+msgid "Found {} files to process:"
+msgstr "Znaleziono {} plikow do przetworzenia:"
+
+#: eanalizer/cli.py:159
+#, python-brace-format
+msgid ""
+"\n"
+"Total loaded {} records."
+msgstr ""
+
+#: eanalizer/cli.py:166
+msgid "No data in the given date range for further analysis."
+msgstr "Brak danych w podanym zakresie dat do dalszej analizy."

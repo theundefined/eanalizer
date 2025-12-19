@@ -20,18 +20,14 @@ def _fetch_daily_rce_from_api(date_str: str) -> Optional[List[Dict]]:
                 json_data = json.loads(data)
                 return json_data.get("value", [])
             else:
-                print(
-                    f"Błąd: API zwróciło status {response.status} dla daty {date_str}"
-                )
+                print(f"Błąd: API zwróciło status {response.status} dla daty {date_str}")
                 return None
     except Exception as e:
         print(f"Błąd podczas połączenia z API dla {date_str}: {e}")
         return None
 
 
-def get_hourly_rce_prices(
-    start_date: datetime, end_date: datetime, cache_dir: Path
-) -> Dict[datetime, float]:
+def get_hourly_rce_prices(start_date: datetime, end_date: datetime, cache_dir: Path) -> Dict[datetime, float]:
     """Pobiera, cachuje i przetwarza ceny RCE, zwracając słownik cen godzinowych."""
     cache_dir.mkdir(parents=True, exist_ok=True)  # Use the passed cache_dir
     all_prices: Dict[datetime, float] = {}
@@ -59,9 +55,7 @@ def get_hourly_rce_prices(
             if not df.empty and "dtime" in df.columns and "rce_pln" in df.columns:
                 df["dtime"] = df["dtime"].str.replace("a", "").str.replace("b", "")
                 df["dtime"] = pd.to_datetime(df["dtime"])
-                hourly_prices = (
-                    df.set_index("dtime")["rce_pln"].resample("h").mean() / 1000
-                )
+                hourly_prices = df.set_index("dtime")["rce_pln"].resample("h").mean() / 1000
                 for ts, price in hourly_prices.items():
                     all_prices[ts] = price
 

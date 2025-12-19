@@ -23,10 +23,7 @@ class EneaDownloader:
         self.config.data_dir.mkdir(exist_ok=True)
 
         current_year = datetime.now().year
-        filename = (
-            self.config.data_dir
-            / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
-        )
+        filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
 
         # Check if the file for the current year needs to be downloaded
         if filename.is_file():
@@ -39,9 +36,7 @@ class EneaDownloader:
                     try:
                         content = f.read()
                         if "---" not in content:
-                            print(
-                                f"Plik {filename} już istnieje i jest prawidłowy. Kończenie."
-                            )
+                            print(f"Plik {filename} już istnieje i jest prawidłowy. Kończenie.")
                             return
                     except UnicodeDecodeError:
                         pass  # File will be re-downloaded
@@ -66,9 +61,7 @@ class EneaDownloader:
                     raise ConnectionError("Nie można znaleźć tokena CSRF.")
                 token = token_match.group(1)
             except requests.exceptions.RequestException as e:
-                raise ConnectionError(
-                    f"Błąd podczas pobierania strony logowania: {e}"
-                ) from e
+                raise ConnectionError(f"Błąd podczas pobierania strony logowania: {e}") from e
 
             # Login
             login_data = {
@@ -79,9 +72,7 @@ class EneaDownloader:
             }
             try:
                 print("Logowanie...")
-                login_response = session.post(
-                    login_url, data=login_data, headers=headers
-                )
+                login_response = session.post(login_url, data=login_data, headers=headers)
                 login_response.raise_for_status()
             except requests.exceptions.RequestException as e:
                 raise ConnectionError(f"Błąd podczas logowania: {e}") from e
@@ -95,14 +86,10 @@ class EneaDownloader:
                     re.DOTALL,
                 )
                 if not client_guid_match:
-                    raise ValueError(
-                        f"Nie można znaleźć identyfikatora dla klienta {self.config.customer_id}"
-                    )
+                    raise ValueError(f"Nie można znaleźć identyfikatora dla klienta {self.config.customer_id}")
                 client_guid = client_guid_match.group(1)
             except Exception as e:
-                raise ValueError(
-                    f"Błąd podczas wyszukiwania identyfikatora klienta: {e}"
-                ) from e
+                raise ValueError(f"Błąd podczas wyszukiwania identyfikatora klienta: {e}") from e
 
             # Select client
             try:
@@ -121,19 +108,13 @@ class EneaDownloader:
                 summary_page = session.get(summary_balancing_chart_url, headers=headers)
                 summary_page.raise_for_status()
 
-                pod_id_match = re.search(
-                    r'data-point-of-delivery-id="(.*?)"', summary_page.text
-                )
+                pod_id_match = re.search(r'data-point-of-delivery-id="(.*?)"', summary_page.text)
                 if not pod_id_match:
                     raise ValueError("Nie można znaleźć pointOfDeliveryId.")
                 point_of_delivery_id = pod_id_match.group(1)
 
-                min_year_match = re.search(
-                    r'data-min-date-value="(\d{4})"', summary_page.text
-                )
-                max_year_match = re.search(
-                    r'data-max-date-value="(\d{4})"', summary_page.text
-                )
+                min_year_match = re.search(r'data-min-date-value="(\d{4})"', summary_page.text)
+                max_year_match = re.search(r'data-max-date-value="(\d{4})"', summary_page.text)
                 if not min_year_match or not max_year_match:
                     raise ValueError("Nie można znaleźć zakresu lat.")
 
@@ -145,22 +126,15 @@ class EneaDownloader:
 
             # Download CSV for each year
             for year in range(min_year, max_year + 1):
-                self._download_year_csv(
-                    session, year, point_of_delivery_id, summary_balancing_chart_url
-                )
+                self._download_year_csv(session, year, point_of_delivery_id, summary_balancing_chart_url)
 
     def _download_year_csv(self, session, year, point_of_delivery_id, referer_url):
-        filename = (
-            self.config.data_dir
-            / f"{self.config.customer_id}_dane_dobowo_godzinowe_{year}.csv"
-        )
+        filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{year}.csv"
 
         # Skip if file is recent (only for current year) or valid
         if filename.is_file():
             if year == datetime.now().year:
-                if datetime.now() - datetime.fromtimestamp(
-                    filename.stat().st_mtime
-                ) < timedelta(hours=1):
+                if datetime.now() - datetime.fromtimestamp(filename.stat().st_mtime) < timedelta(hours=1):
                     print(f"Plik {filename} jest nowszy niż 1 godzina. Pomijanie.")
                     return
             with open(filename, "r", encoding="utf-8") as f:

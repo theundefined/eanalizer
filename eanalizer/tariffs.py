@@ -9,15 +9,9 @@ class TariffManager:
         self.tariffs_df = pd.read_csv(config_path)
         self.holidays = holidays.Poland(years=years)
 
-    def get_zone_and_price(
-        self, timestamp: datetime, tariff: str
-    ) -> Optional[Tuple[str, float, float]]:
+    def get_zone_and_price(self, timestamp: datetime, tariff: str) -> Optional[Tuple[str, float, float]]:
         """Zwraca nazwę strefy, cenę za energię i cenę za dystrybucję dla podanego znacznika czasu i taryfy."""
-        day_type = (
-            "weekend"
-            if timestamp.weekday() >= 5 or timestamp in self.holidays
-            else "weekday"
-        )
+        day_type = "weekend" if timestamp.weekday() >= 5 or timestamp in self.holidays else "weekday"
         hour = timestamp.hour
 
         rules = self.tariffs_df[self.tariffs_df["tariff"].str.lower() == tariff.lower()]

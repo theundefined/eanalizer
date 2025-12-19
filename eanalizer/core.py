@@ -49,9 +49,7 @@ def run_full_analysis(
             # Apply efficiency on charging
             wolne_miejsce_netto = capacity - stan_magazynu
             potrzebna_nadwyzka_brutto = (
-                wolne_miejsce_netto / storage_efficiency
-                if storage_efficiency > 0
-                else float("inf")
+                wolne_miejsce_netto / storage_efficiency if storage_efficiency > 0 else float("inf")
             )
 
             realna_nadwyzka_do_ladowania = min(nadwyzka, potrzebna_nadwyzka_brutto)
@@ -81,9 +79,7 @@ def run_full_analysis(
             pobor_z_magazynu = 0.0
             oddanie_do_magazynu = 0.0
 
-        zone, energy_price, dist_price = tariff_manager.get_zone_and_price(
-            rekord.timestamp, tariff
-        )
+        zone, energy_price, dist_price = tariff_manager.get_zone_and_price(rekord.timestamp, tariff)
         if zone:
             price = energy_price + dist_price
             if zone not in stats["strefy"]:
@@ -134,9 +130,7 @@ def run_full_analysis(
         stats["calkowity_koszt"] = total_cost
         stats["niewykorzystany_kredyt_koncowy"] = rollover_credit
     else:
-        stats["calkowity_koszt"] = sum(
-            zone_stats["koszt_poboru"] for zone_stats in stats["strefy"].values()
-        )
+        stats["calkowity_koszt"] = sum(zone_stats["koszt_poboru"] for zone_stats in stats["strefy"].values())
 
     fixed_fee = tariff_manager.get_fixed_fee(tariff) * num_months
     stats["oplaty_stale"] = fixed_fee
@@ -144,9 +138,7 @@ def run_full_analysis(
         stats["calkowity_koszt"] += fixed_fee
 
     oryginalny_pobor = sum(d.pobor_przed for d in data)
-    calkowity_pobor_z_sieci = sum(
-        zone_stats["pobor_z_sieci"] for zone_stats in stats["strefy"].values()
-    )
+    calkowity_pobor_z_sieci = sum(zone_stats["pobor_z_sieci"] for zone_stats in stats["strefy"].values())
     stats["oszczednosc"] = oryginalny_pobor - calkowity_pobor_z_sieci
 
     return stats, pd.DataFrame(wyniki_symulacji)
@@ -165,9 +157,7 @@ def print_analysis_summary(
     print(f"\n{header}")
 
     for zone, stats in sorted(summary.get("strefy", {}).items()):
-        print(
-            f"\n--- STREFA: {zone.upper()} (cena: {stats.get('price', 0):.2f} zł/kWh) ---"
-        )
+        print(f"\n--- STREFA: {zone.upper()} (cena: {stats.get('price', 0):.2f} zł/kWh) ---")
         pobor_z_sieci = stats.get("pobor_z_sieci", 0)
         oddanie_do_sieci = stats.get("oddanie_do_sieci", 0)
 
@@ -183,9 +173,7 @@ def print_analysis_summary(
             print(
                 f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {stats.get('magazyn_w_strefie', 0):.3f} kWh"
             )
-            print(
-                f"Kredyt z poprzedniej strefy: {stats.get('kredyt_z_poprzedniej', 0):.3f} kWh"
-            )
+            print(f"Kredyt z poprzedniej strefy: {stats.get('kredyt_z_poprzedniej', 0):.3f} kWh")
             print(
                 f"Energia do opłacenia w strefie: {stats.get('energia_do_oplacenia', 0):.3f} kWh (koszt: {stats.get('koszt_poboru', 0):.2f} zł)"
             )
@@ -194,21 +182,13 @@ def print_analysis_summary(
 
     print("\n---------------------------------------------")
     print(f"OPLATY STALE: {summary.get('oplaty_stale', 0):.2f} zł")
-    koszt_label = (
-        "SUMARYCZNY KOSZT (z magazynem)"
-        if capacity > 0
-        else "SUMARYCZNY KOSZT (po rozliczeniu)"
-    )
+    koszt_label = "SUMARYCZNY KOSZT (z magazynem)" if capacity > 0 else "SUMARYCZNY KOSZT (po rozliczeniu)"
     print(f"{koszt_label}: {summary.get('calkowity_koszt', 0):.2f} zł")
 
     if net_metering_ratio is not None:
-        print(
-            f"Niewykorzystany kredyt na koniec okresu: {summary.get('niewykorzystany_kredyt_koncowy', 0):.3f} kWh"
-        )
+        print(f"Niewykorzystany kredyt na koniec okresu: {summary.get('niewykorzystany_kredyt_koncowy', 0):.3f} kWh")
     if capacity > 0:
-        print(
-            f"Zaoszczedzona energia dzieki magazynowi: {summary.get('oszczednosc', 0):.3f} kWh"
-        )
+        print(f"Zaoszczedzona energia dzieki magazynowi: {summary.get('oszczednosc', 0):.3f} kWh")
     print("---------------------------------------------")
 
 
@@ -228,13 +208,13 @@ def run_tariff_comparison(
     results = {}
     header = "--- Porównanie taryf ---"
     if capacity > 0:
-        header = f"--- Porównanie taryf z magazynem fizycznym ({capacity} kWh, sprawność {int(storage_efficiency*100)}%) ---"
+        header = (
+            f"--- Porównanie taryf z magazynem fizycznym ({capacity} kWh, sprawność {int(storage_efficiency*100)}%) ---"
+        )
     print(f"\n{header}")
 
     if verbose:
-        print(
-            "Tryb szczegółowy włączony. Pokazywanie pełnej analizy dla każdej taryfy."
-        )
+        print("Tryb szczegółowy włączony. Pokazywanie pełnej analizy dla każdej taryfy.")
 
     for tariff in all_tariffs:
         summary, _ = run_full_analysis(
@@ -257,9 +237,7 @@ def run_tariff_comparison(
     if verbose:
         print(f"\n{'='*20} PODSUMOWANIE PORÓWNANIA {'='*20}")
 
-    print(
-        f"Analiza dla okresu od {data[0].timestamp.date()} do {data[-1].timestamp.date()}"
-    )
+    print(f"Analiza dla okresu od {data[0].timestamp.date()} do {data[-1].timestamp.date()}")
     if net_metering_ratio:
         print(f"Uwzględniono net-metering ze współczynnikiem {net_metering_ratio}")
     print("---------------------------------------------")
@@ -269,9 +247,7 @@ def run_tariff_comparison(
 
     if sorted_results:
         best_tariff, best_cost = sorted_results[0]
-        print(
-            f"\nNajkorzystniejsza taryfa w tym okresie: {best_tariff} ({best_cost:.2f} zł)"
-        )
+        print(f"\nNajkorzystniejsza taryfa w tym okresie: {best_tariff} ({best_cost:.2f} zł)")
     else:
         print("Nie udało się obliczyć kosztów dla żadnej taryfy.")
     return results
@@ -302,15 +278,9 @@ def filter_data_by_date(
     if not data or not (start_date_str or end_date_str):
         return data
     try:
-        start_date = (
-            datetime.strptime(start_date_str, "%Y-%m-%d") if start_date_str else None
-        )
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d") if start_date_str else None
         end_date = (
-            datetime.strptime(end_date_str, "%Y-%m-%d").replace(
-                hour=23, minute=59, second=59
-            )
-            if end_date_str
-            else None
+            datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59) if end_date_str else None
         )
     except ValueError:
         print("Błąd: Niepoprawny format daty. Użyj formatu RRRR-MM-DD.")
@@ -318,14 +288,9 @@ def filter_data_by_date(
     if start_date and end_date and start_date > end_date:
         print("Błąd: Data początkowa nie może być późniejsza niż data końcowa.")
         return []
-    print(
-        f"\nFiltrowanie danych w zakresie od {start_date_str or 'początku'} do {end_date_str or 'końca'}..."
-    )
+    print(f"\nFiltrowanie danych w zakresie od {start_date_str or 'początku'} do {end_date_str or 'końca'}...")
     filtered_list = [
-        d
-        for d in data
-        if (not start_date or d.timestamp >= start_date)
-        and (not end_date or d.timestamp <= end_date)
+        d for d in data if (not start_date or d.timestamp >= start_date) and (not end_date or d.timestamp <= end_date)
     ]
     print(f"Po filtrowaniu pozostało {len(filtered_list)} rekordów.")
     return filtered_list
@@ -373,52 +338,30 @@ def calculate_optimal_capacity(
     net_export_days = daily_data[daily_data["oddanie"] > daily_data["pobor"]]
     capacity_for_export_days = 0
     if not net_export_days.empty:
-        required_capacities = [
-            hourly_df[hourly_df["date"] == day]["pobor"].sum()
-            for day in net_export_days["date"]
-        ]
-        capacity_for_export_days = (
-            max(required_capacities) if required_capacities else 0
-        )
+        required_capacities = [hourly_df[hourly_df["date"] == day]["pobor"].sum() for day in net_export_days["date"]]
+        capacity_for_export_days = max(required_capacities) if required_capacities else 0
     capacity_for_import_days = 0
     expensive_zone_name = None  # Initialize to None
 
     # Dynamically find the name of the most expensive zone for the given tariff
-    tariff_rules = tariff_manager.tariffs_df[
-        tariff_manager.tariffs_df["tariff"].str.lower() == tariff.lower()
-    ].copy()
+    tariff_rules = tariff_manager.tariffs_df[tariff_manager.tariffs_df["tariff"].str.lower() == tariff.lower()].copy()
     if not tariff_rules.empty:
-        tariff_rules["total_price"] = (
-            tariff_rules["energy_price"] + tariff_rules["dist_price"]
-        )
-        expensive_zone_name = tariff_rules.loc[tariff_rules["total_price"].idxmax()][
-            "zone_name"
-        ]
+        tariff_rules["total_price"] = tariff_rules["energy_price"] + tariff_rules["dist_price"]
+        expensive_zone_name = tariff_rules.loc[tariff_rules["total_price"].idxmax()]["zone_name"]
 
         if expensive_zone_name:
             hourly_df["zone"] = hourly_df["timestamp"].apply(
-                lambda ts: tariff_manager.get_zone_and_price(ts, tariff)[0]
-                or "poza strefa"
+                lambda ts: tariff_manager.get_zone_and_price(ts, tariff)[0] or "poza strefa"
             )
             # Arbitrage capacity is the max consumption in the high zone on any given day
             pobor_w_strefie_wysokiej = (
-                hourly_df[hourly_df["zone"] == expensive_zone_name]
-                .groupby("date")["pobor_przed"]
-                .sum()
+                hourly_df[hourly_df["zone"] == expensive_zone_name].groupby("date")["pobor_przed"].sum()
             )
-            capacity_for_import_days = (
-                pobor_w_strefie_wysokiej.max()
-                if not pobor_w_strefie_wysokiej.empty
-                else 0
-            )
+            capacity_for_import_days = pobor_w_strefie_wysokiej.max() if not pobor_w_strefie_wysokiej.empty else 0
     optimal_capacity = max(capacity_for_export_days, capacity_for_import_days)
     print("\n--- Kalkulacja optymalnej pojemności magazynu ---")
-    print(
-        f"Pojemność wymagana dla dni z nadprodukcją: {capacity_for_export_days:.3f} kWh"
-    )
-    print(
-        f"Pojemność wymagana dla arbitrażu taryfowego: {capacity_for_import_days:.3f} kWh"
-    )
+    print(f"Pojemność wymagana dla dni z nadprodukcją: {capacity_for_export_days:.3f} kWh")
+    print(f"Pojemność wymagana dla arbitrażu taryfowego: {capacity_for_import_days:.3f} kWh")
     print("Optymalna pojemność (większa z powyższych):")
     print(f"Wynik: {optimal_capacity:.3f} kWh")
     print("--------------------------------------------------")
@@ -432,33 +375,23 @@ def analyze_daily_trends(daily_df: pd.DataFrame):
     total_days = len(daily_df)
     percentage = (net_export_days_count / total_days) * 100 if total_days > 0 else 0
     print("\n--- Analiza trendów dziennych ---")
-    print(
-        f"Liczba dni z nadprodukcją energii: {net_export_days_count} z {total_days} dni"
-    )
+    print(f"Liczba dni z nadprodukcją energii: {net_export_days_count} z {total_days} dni")
     print(f"Procent dni z nadprodukcją energii: {percentage:.2f}%")
     print("-----------------------------------")
 
 
-def find_missing_hours(
-    data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]
-):
+def find_missing_hours(data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]):
     if not data or not (start_date_str or end_date_str):
         return
     df = pd.DataFrame(data).set_index("timestamp")
     start_time = pd.to_datetime(start_date_str) if start_date_str else df.index.min()
-    end_time = (
-        pd.to_datetime(end_date_str).replace(hour=23, minute=59)
-        if end_date_str
-        else df.index.max()
-    )
+    end_time = pd.to_datetime(end_date_str).replace(hour=23, minute=59) if end_date_str else df.index.max()
     expected_range = pd.date_range(start=start_time, end=end_time, freq="h")
     missing_timestamps = expected_range.difference(df.index)
     if not missing_timestamps.empty:
         print("\n--- UWAGA: Wykryto brakujące godziny w danych ---")
         if len(missing_timestamps) > 24:
-            print(
-                f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone."
-            )
+            print(f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone.")
         for ts in missing_timestamps[:24]:
             print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}")
         if len(missing_timestamps) > 24:

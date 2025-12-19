@@ -75,23 +75,11 @@ def _get_default_dir(dir_type: str) -> Path:
     is_dev_env = Path.cwd().joinpath("pyproject.toml").is_file()
 
     if dir_type == "config":
-        return (
-            Path.cwd() / "config"
-            if is_dev_env
-            else Path(platformdirs.user_config_dir(APP_NAME, appauthor=False))
-        )
+        return Path.cwd() / "config" if is_dev_env else Path(platformdirs.user_config_dir(APP_NAME, appauthor=False))
     if dir_type == "data":
-        return (
-            Path.cwd() / "data"
-            if is_dev_env
-            else Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
-        )
+        return Path.cwd() / "data" if is_dev_env else Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
     if dir_type == "cache":
-        return (
-            Path.cwd() / "cache"
-            if is_dev_env
-            else Path(platformdirs.user_cache_dir(APP_NAME, appauthor=False))
-        )
+        return Path.cwd() / "cache" if is_dev_env else Path(platformdirs.user_cache_dir(APP_NAME, appauthor=False))
 
     raise ValueError(f"Unknown directory type: {dir_type}")
 
@@ -113,18 +101,12 @@ def _prompt_for_single_path(dir_type: str, description: str) -> Path:
 
 def _prompt_for_paths(config_file_path: Path) -> dict:
     """Prompts the user for all required directory paths."""
-    print(
-        f"Plik konfiguracyjny nie zostal znaleziony lub jest niekompletny: {config_file_path}"
-    )
+    print(f"Plik konfiguracyjny nie zostal znaleziony lub jest niekompletny: {config_file_path}")
     print("Prosze podac sciezki do katalogow aplikacji.")
 
-    config_dir = _prompt_for_single_path(
-        "config", "Katalog na konfiguracje (np. taryfy)"
-    )
+    config_dir = _prompt_for_single_path("config", "Katalog na konfiguracje (np. taryfy)")
     data_dir = _prompt_for_single_path("data", "Katalog na dane od Enea")
-    cache_dir = _prompt_for_single_path(
-        "cache", "Katalog na pamiec podreczna (np. ceny RCE)"
-    )
+    cache_dir = _prompt_for_single_path("cache", "Katalog na pamiec podreczna (np. ceny RCE)")
 
     return {"config_dir": config_dir, "data_dir": data_dir, "cache_dir": cache_dir}
 
@@ -145,9 +127,7 @@ def _prompt_for_enea_credentials() -> dict:
             login_page.raise_for_status()
             token_match = re.search(r'name="token" value="(.*?)"', login_page.text)
             if not token_match:
-                raise ConnectionError(
-                    "Blad: Nie mozna znalezc tokena CSRF na stronie logowania."
-                )
+                raise ConnectionError("Blad: Nie mozna znalezc tokena CSRF na stronie logowania.")
             token = token_match.group(1)
 
             login_data = {
@@ -156,14 +136,10 @@ def _prompt_for_enea_credentials() -> dict:
                 "token": token,
                 "btnSubmit": "",
             }
-            login_response = session.post(
-                "https://ebok.enea.pl/logowanie", data=login_data, headers=headers
-            )
+            login_response = session.post("https://ebok.enea.pl/logowanie", data=login_data, headers=headers)
             login_response.raise_for_status()
             if "Lista kontrahentów" not in login_response.text:
-                raise ValueError(
-                    "Logowanie nie powiodlo sie. Sprawdz swoje dane uwierzytelniajace."
-                )
+                raise ValueError("Logowanie nie powiodlo sie. Sprawdz swoje dane uwierzytelniajace.")
 
             customers = re.findall(
                 r'<span>\s*(\d+)\s*</span>.*?href="/dashboard/select-current-client/([a-f0-9\-]+)"',
@@ -171,9 +147,7 @@ def _prompt_for_enea_credentials() -> dict:
                 re.DOTALL,
             )
             if not customers:
-                raise ValueError(
-                    "Blad: Nie znaleziono profili klientow dla tego konta."
-                )
+                raise ValueError("Blad: Nie znaleziono profili klientow dla tego konta.")
 
             print("Weryfikacja, ktore profile posiadaja dane godzinowe...")
             valid_customers = []
@@ -201,20 +175,14 @@ def _prompt_for_enea_credentials() -> dict:
                     print(f"Nie udalo sie zweryfikowac profilu {id}: {e}")
 
             if not valid_customers:
-                raise ValueError(
-                    "Blad: Nie znaleziono profili klientow z dostepnymi danymi godzinnymi."
-                )
+                raise ValueError("Blad: Nie znaleziono profili klientow z dostepnymi danymi godzinnymi.")
 
             customer_id = None
             if len(valid_customers) == 1:
                 customer_id = valid_customers[0][0]
-                print(
-                    f"Znaleziono jeden prawidlowy profil klienta: {customer_id}. Wybieram automatycznie."
-                )
+                print(f"Znaleziono jeden prawidlowy profil klienta: {customer_id}. Wybieram automatycznie.")
             else:
-                print(
-                    "Znaleziono wiele prawidlowych profili klientow. Prosze wybrac jeden:"
-                )
+                print("Znaleziono wiele prawidlowych profili klientow. Prosze wybrac jeden:")
                 for i, (id, guid) in enumerate(valid_customers):
                     print(f"[{i + 1}] {id}")
                 while True:
@@ -233,9 +201,7 @@ def _prompt_for_enea_credentials() -> dict:
             raise SystemExit(1)
 
 
-def load_config(
-    require_credentials: bool = False, prompt_for_missing: bool = True
-) -> AppConfig:
+def load_config(require_credentials: bool = False, prompt_for_missing: bool = True) -> AppConfig:
     """Loads application config, prompting if missing/incomplete."""
     initial_config_dir = _get_default_dir("config")
     config_file = initial_config_dir / CONFIG_FILE_NAME
@@ -257,14 +223,10 @@ def load_config(
 
     if not config_is_valid:
         if not prompt_for_missing:
-            raise FileNotFoundError(
-                f"Plik konfiguracyjny nie istnieje lub jest niekompletny: {config_file}"
-            )
+            raise FileNotFoundError(f"Plik konfiguracyjny nie istnieje lub jest niekompletny: {config_file}")
         paths = _prompt_for_paths(config_file)
 
-    if require_credentials and not all(
-        k in creds for k in ["email", "password", "customer_id"]
-    ):
+    if require_credentials and not all(k in creds for k in ["email", "password", "customer_id"]):
         if not prompt_for_missing:
             raise ValueError("Brakujące dane uwierzytelniające Enea.")
         print("Brak zapisanych danych logowania Enea lub są one niekompletne.")
@@ -292,9 +254,7 @@ def load_config(
             "G12w,pozaszczytowa,weekday,22,24,0.426195,0.153381,55.0302\n"
             "G12w,pozaszczytowa,weekend,0,24,0.426195,0.153381,55.0302\n"
         )
-        app_cfg.tariffs_file.write_text(
-            default_tariffs_content.replace("\\n", "\n"), encoding="utf-8"
-        )
+        app_cfg.tariffs_file.write_text(default_tariffs_content.replace("\\n", "\n"), encoding="utf-8")
 
     app_cfg.save()
     return app_cfg

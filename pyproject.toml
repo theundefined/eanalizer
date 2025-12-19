@@ -36,5 +36,10 @@ dependencies = [
 eanalizer = "eanalizer.cli:main"
 enea-downloader = "eanalizer.downloader_cli:main"
 
+[project.optional-dependencies]
+dev = [
+    "Babel",
+]
+
 [tool.setuptools]
 packages = ["eanalizer"]
