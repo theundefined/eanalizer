@@ -281,15 +281,16 @@ def load_config(
 
     if not app_cfg.tariffs_file.is_file():
         print(f"Tworzenie domyslnego pliku taryf w: {app_cfg.tariffs_file}")
+        # Ceny brutto (z VAT 23%) na podstawie taryfy ENEA Operator 2026.
         default_tariffs_content = (
-            "tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n"
-            "G11,stala,all,0,24,0.97\n"
-            "G12,tansza,weekday,22,6,0.72\n"
-            "G12,drozsza,weekday,6,22,1.15\n"
-            "G12,tansza,weekend,0,24,0.72\n"
-            "G12w,tansza,weekday,22,6,0.72\n"
-            "G12w,drozsza,weekday,6,22,1.15\n"
-            "G12w,stala,weekend,0,24,0.72\n"
+            "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
+            "G11,stala,all,0,24,0.61254,0.35547,43.4682\n"
+            "G12,nocna,all,22,6,0.414387,0.165681,46.1004\n"
+            "G12,dzienna,all,6,22,0.710817,0.395199,46.1004\n"
+            "G12w,pozaszczytowa,weekday,0,6,0.426195,0.153381,55.0302\n"
+            "G12w,szczytowa,weekday,6,22,0.801714,0.385728,55.0302\n"
+            "G12w,pozaszczytowa,weekday,22,24,0.426195,0.153381,55.0302\n"
+            "G12w,pozaszczytowa,weekend,0,24,0.426195,0.153381,55.0302\n"
         )
         app_cfg.tariffs_file.write_text(
             default_tariffs_content.replace("\\n", "\n"), encoding="utf-8"
