@@ -9,7 +9,13 @@ from datetime import datetime
 
 from eanalizer.data_loader import load_from_enea_csv
 from eanalizer.price_fetcher import get_hourly_rce_prices
-from eanalizer.core import run_rce_analysis, run_analysis_with_tariffs
+import pandas as pd
+from eanalizer.core import (
+    run_rce_analysis,
+    run_full_analysis,
+    print_analysis_summary,
+    calculate_optimal_capacity,
+)
 from eanalizer.tariffs import TariffManager
 from eanalizer.models import EnergyData
 from eanalizer.config import AppConfig
@@ -47,11 +53,13 @@ class TestCoreFunctionality(unittest.TestCase):
         # Create a dummy tariffs file inside the temporary config directory
         tariffs_path = cls.config_dir / "tariffs.csv"
         with open(tariffs_path, "w") as f:
-            f.write("tariff,zone_name,day_type,start_hour,end_hour,price_per_kwh\n")
-            f.write("G12w,wysoka,weekday,6,21,1.08\n")
-            f.write("G12w,niska,weekday,0,6,0.76\n")
-            f.write("G12w,niska,weekday,21,24,0.76\n")
-            f.write("G12w,niska,weekend,0,24,0.76\n")
+            f.write(
+                "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
+            )
+            f.write("G12w,szczytowa,weekday,6,21,0.78,0.30,10.0\n")
+            f.write("G12w,pozaszczytowa,weekday,0,6,0.46,0.30,10.0\n")
+            f.write("G12w,pozaszczytowa,weekday,21,24,0.46,0.30,10.0\n")
+            f.write("G12w,pozaszczytowa,weekend,0,24,0.46,0.30,10.0\n")
 
         # Create a test AppConfig instance with the new structure
         cls.test_config = AppConfig(
@@ -135,17 +143,75 @@ class TestCoreFunctionality(unittest.TestCase):
         original_stdout = sys.stdout
         sys.stdout = captured_output = StringIO()
 
-        run_analysis_with_tariffs(
+        summary, _ = run_full_analysis(
             data=test_data,
+            capacity=0,
             tariff="G12w",
             tariff_manager=self.tariff_manager,  # Pass the tariff_manager
-            should_calc_optimal_capacity=False,
-            daily_export_path=None,
             net_metering_ratio=0.8,
         )
+        print_analysis_summary(summary, 0, "G12w", 0.8)
+
         sys.stdout = original_stdout
         output = captured_output.getvalue()
 
+        # Wysoka: oddanie 5 * 0.8 = 4. Pobor 2.5. Rollover 1.5
+        # Niska: pobor 2.0. Kredyt 1.5. Do zaplaty 0.5. Koszt 0.5 * 0.76 = 0.38
         self.assertIn("Kredyt z poprzedniej strefy: 1.500 kWh", output)
         self.assertIn("Energia do opłacenia w strefie: 0.500 kWh", output)
-        self.assertIn("SUMARYCZNY KOSZT ENERGII (po rozliczeniu): 0.38 zł", output)
+        self.assertIn("SUMARYCZNY KOSZT (po rozliczeniu): 10.38 zł", output)
+
+    def test_optimal_capacity_g12w_arbitrage_on_net_export_day(self):
+        """
+        Testuje obliczanie pojemności dla arbitrażu nawet w dniu,
+        który jest ogólnie dniem eksportu netto.
+        """
+        # Net-export day, but with consumption during the high-price zone
+        test_data = [
+            EnergyData(
+                timestamp=datetime(2024, 5, 2, 12, 0),
+                pobor_przed=5.0,
+                oddanie_przed=0.0,
+                pobor=5.0,
+                oddanie=0.0,
+            ),
+            EnergyData(
+                timestamp=datetime(2024, 5, 2, 4, 0),
+                pobor_przed=0.0,
+                oddanie_przed=10.0,
+                pobor=0.0,
+                oddanie=10.0,
+            ),
+        ]
+        # Daily data: pobor=5, oddanie=10 -> net export
+        daily_df = pd.DataFrame(
+            [
+                {
+                    "date": datetime(2024, 5, 2).date(),
+                    "pobor_przed": 5.0,
+                    "oddanie_przed": 10.0,
+                    "pobor": 0.0,
+                    "oddanie": 5.0,
+                }
+            ]
+        )
+
+        import sys
+        from io import StringIO
+
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+
+        calculate_optimal_capacity(
+            hourly_data=test_data,
+            daily_data=daily_df,
+            tariff_manager=self.tariff_manager,
+            tariff="G12w",
+        )
+
+        sys.stdout = original_stdout
+        output = captured_output.getvalue()
+
+        # The capacity for arbitrage should still be 5.0, as this is the consumption
+        # in the high-price zone that could be shifted.
+        self.assertIn("Pojemność wymagana dla arbitrażu taryfowego: 5.000 kWh", output)

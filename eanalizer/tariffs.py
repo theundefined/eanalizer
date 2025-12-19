@@ -20,7 +20,7 @@ class TariffManager:
         )
         hour = timestamp.hour
 
-        rules = self.tariffs_df[self.tariffs_df["tariff"] == tariff]
+        rules = self.tariffs_df[self.tariffs_df["tariff"].str.lower() == tariff.lower()]
         if not rules.empty and "all" in rules["day_type"].unique():
             day_type = "all"
 

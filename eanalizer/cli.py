@@ -8,11 +8,14 @@ from .price_fetcher import get_hourly_rce_prices
 from .core import (
     filter_data_by_date,
     export_to_csv,
-    simulate_physical_storage,
-    run_analysis_with_tariffs,
+    run_full_analysis,
+    print_analysis_summary,
     run_rce_analysis,
     find_missing_hours,
     run_tariff_comparison,
+    analyze_daily_trends,
+    calculate_optimal_capacity,
+    aggregate_daily_data,
 )
 from .config import load_config
 
@@ -21,7 +24,6 @@ def main():
     """Glowna funkcja uruchomieniowa dla CLI."""
     parser = argparse.ArgumentParser(description="Analizator danych energetycznych.")
 
-    # Grupa argumentow wykluczajacych sie: albo pliki, albo katalog
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-p",
@@ -33,15 +35,14 @@ def main():
         "-k",
         "--katalog",
         default=None,
-        help="Sciezka do katalogu z plikami .csv. Nadpisuje sciezke z konfiguracji.",
+        help="Sciezka do katalogu z plikami .csv.",
     )
 
     parser.add_argument(
         "-t",
         "--taryfa",
-        choices=["G11", "G12", "G12w"],
         default="G11",
-        help="Okresla taryfe energetyczna (domyslnie: G11).",
+        help="Okresla taryfe energetyczna dla pojedynczej analizy (domyslnie: G11).",
     )
     parser.add_argument(
         "--data-start", help="Data poczatkowa analizy (format RRRR-MM-DD)."
@@ -52,7 +53,13 @@ def main():
     parser.add_argument(
         "--magazyn-fizyczny",
         type=float,
-        help="Uruchamia symulacje fizycznego magazynu o podanej pojemnosci w kWh.",
+        help="Pojemnosc fizycznego magazynu w kWh (np. 10.0).",
+    )
+    parser.add_argument(
+        "--sprawnosc-magazynu",
+        type=float,
+        default=0.9,
+        help="Sprawność magazynu fizycznego (round-trip, domyslnie: 0.90, czyli 90%%).",
     )
     parser.add_argument(
         "--eksport-symulacji",
@@ -97,16 +104,13 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # Wczytaj konfiguracje aplikacji. Jesli nie istnieje, uzytkownik zostanie
-    # poproszony o jej utworzenie.
     app_cfg = load_config()
 
+    # Data loading
     files_to_process = []
     if args.pliki:
         files_to_process = args.pliki
     else:
-        # Uzyj katalogu podanego w argumencie lub tego z konfiguracji
         katalog = args.katalog if args.katalog is not None else str(app_cfg.data_dir)
         path = os.path.join(katalog, "*.csv")
         files_to_process = sorted(glob.glob(path))
@@ -114,125 +118,83 @@ def main():
     if not files_to_process:
         katalog_info = args.katalog if args.katalog is not None else app_cfg.data_dir
         print(f"Nie znaleziono plikow .csv do przetworzenia w: {katalog_info}")
-        print("Uruchom 'enea-downloader-cli', aby pobrac dane.")
         return
 
     print(f"Znaleziono {len(files_to_process)} plikow do przetworzenia:")
-    for f in files_to_process:
-        print(f" - {f}")
-
     all_energy_data = []
     for file_path in files_to_process:
         all_energy_data.extend(load_from_enea_csv(file_path))
-
     all_energy_data.sort(key=lambda x: x.timestamp)
+    print(f"\nLacznia wczytano {len(all_energy_data)} rekordow.")
 
-    if all_energy_data:
-        print(f"\nLacznia wczytano {len(all_energy_data)} rekordow.")
-        oldest_date = all_energy_data[0].timestamp
-        newest_date = all_energy_data[-1].timestamp
-        print(
-            f"Najstarsze dane pochodza z: {oldest_date.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        print(f"Najnowsze dane pochodza z: {newest_date.strftime('%Y-%m-%d %H:%M:%S')}")
-    else:
-        print("\nNie wczytano zadnych rekordow.")
-        return
-
+    # Data filtering
     filtered_data = filter_data_by_date(
         all_energy_data, args.data_start, args.data_koniec
     )
-
     if not filtered_data:
         print("Brak danych w podanym zakresie dat do dalszej analizy.")
         return
-
     if args.data_start or args.data_koniec:
         find_missing_hours(filtered_data, args.data_start, args.data_koniec)
 
     min_year = min(d.timestamp.year for d in filtered_data)
     max_year = max(d.timestamp.year for d in filtered_data)
-
     tariff_manager = TariffManager(
         str(app_cfg.tariffs_file), years=range(min_year, max_year + 1)
     )
 
-    if args.porownaj_taryfy:
-        net_metering_ratio = (
-            args.wspolczynnik_netmetering if args.z_netmetering else None
-        )
-        run_tariff_comparison(
-            data=filtered_data,
-            tariff_manager=tariff_manager,
-            net_metering_ratio=net_metering_ratio,
-            verbose=args.verbose,
-        )
-    elif args.z_cenami_rce:
+    # Determine analysis parameters
+    net_metering_ratio = args.wspolczynnik_netmetering if args.z_netmetering else None
+    capacity = (
+        args.magazyn_fizyczny
+        if args.magazyn_fizyczny and args.magazyn_fizyczny > 0
+        else 0.0
+    )
+    storage_efficiency = args.sprawnosc_magazynu
+
+    # --- Main analysis logic ---
+    if args.z_cenami_rce:
         start_date = filtered_data[0].timestamp
         end_date = filtered_data[-1].timestamp
         hourly_prices = get_hourly_rce_prices(
             start_date, end_date, cache_dir=app_cfg.cache_dir
         )
         run_rce_analysis(filtered_data, hourly_prices)
-    elif args.magazyn_fizyczny and args.magazyn_fizyczny > 0:
-        print(
-            f"\nUruchamiam symulacje fizycznego magazynu energii o pojemnosci {args.magazyn_fizyczny} kWh..."
-        )
-        net_metering_ratio = (
-            args.wspolczynnik_netmetering if args.z_netmetering else None
-        )
-        summary, simulation_df = simulate_physical_storage(
-            filtered_data,
-            args.magazyn_fizyczny,
-            tariff_manager,
-            args.taryfa,
-            net_metering_ratio=net_metering_ratio,
-        )
-        print("\n--- Wyniki symulacji magazynu fizycznego ---")
-        for zone, stats in sorted(summary["strefy"].items()):
-            print(
-                f"\n--- STREFA: {zone.upper()} (cena: {stats['price']:.2f} zl/kWh) ---"
-            )
-            print(f"Energia pobrana z sieci: {stats['pobor_z_sieci']:.3f} kWh")
-            print(f"Energia oddana do sieci:  {stats['oddanie_do_sieci']:.3f} kWh")
-            if net_metering_ratio is not None:
-                print(
-                    f"Wytworzony kredyt w strefie ({int(net_metering_ratio * 100)}%): {stats.get('magazyn_w_strefie', 0):.3f} kWh"
-                )
-                print(
-                    f"Kredyt z poprzedniej strefy: {stats.get('kredyt_z_poprzedniej', 0):.3f} kWh"
-                )
-                print(
-                    f"Energia do oplacenia w strefie: {stats.get('energia_do_oplacenia', 0):.3f} kWh (koszt: {stats.get('koszt_poboru', 0):.2f} zl)"
-                )
-            else:
-                print(f"Koszt poboru z sieci: {stats.get('koszt_poboru', 0):.2f} zl")
-        print("\n---------------------------------------------")
-        print(
-            f"SUMARYCZNY KOSZT (z magazynem): {summary.get('calkowity_koszt', 0):.2f} zl"
-        )
-        if net_metering_ratio is not None:
-            print(
-                f"Niewykorzystany kredyt na koniec okresu: {summary.get('niewykorzystany_kredyt_koncowy', 0):.3f} kWh"
-            )
-        print(
-            f"Zaoszczedzona energia dzieki magazynowi: {summary.get('oszczednosc', 0):.3f} kWh"
-        )
-        print("---------------------------------------------")
-        if args.eksport_symulacji:
-            export_to_csv(simulation_df, args.eksport_symulacji)
-    else:
-        net_metering_ratio = (
-            args.wspolczynnik_netmetering if args.z_netmetering else None
-        )
-        run_analysis_with_tariffs(
+    elif args.porownaj_taryfy:
+        run_tariff_comparison(
             data=filtered_data,
-            tariff=args.taryfa,
             tariff_manager=tariff_manager,
-            should_calc_optimal_capacity=args.oblicz_optymalny_magazyn,
-            daily_export_path=args.eksport_dzienny,
+            capacity=capacity,
             net_metering_ratio=net_metering_ratio,
+            storage_efficiency=storage_efficiency,
+            verbose=args.verbose,
         )
+    else:
+        # Single analysis run
+        summary, simulation_df = run_full_analysis(
+            data=filtered_data,
+            capacity=capacity,
+            tariff_manager=tariff_manager,
+            tariff=args.taryfa,
+            net_metering_ratio=net_metering_ratio,
+            storage_efficiency=storage_efficiency,
+        )
+        print_analysis_summary(summary, capacity, args.taryfa, net_metering_ratio)
+
+        # Post-analysis actions for single run
+        daily_data_df = aggregate_daily_data(filtered_data)
+        analyze_daily_trends(daily_data_df)
+
+        if args.oblicz_optymalny_magazyn:
+            calculate_optimal_capacity(
+                filtered_data, daily_data_df, tariff_manager, args.taryfa
+            )
+
+        if args.eksport_dzienny:
+            export_to_csv(daily_data_df, args.eksport_dzienny)
+
+        if args.eksport_symulacji and simulation_df is not None:
+            export_to_csv(simulation_df, args.eksport_symulacji)
 
 
 if __name__ == "__main__":
