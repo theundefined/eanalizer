@@ -55,8 +55,7 @@ jobs:
         contains(fromJSON('["opened", "reopened"]'), github.event.action)
       ) || (
         github.event.sender.type == 'User' &&
-        startsWith(github.event.comment.body || github.event.review.body || github.event.issue.body, '@gemini-cli') &&
-        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association)
+        startsWith(github.event.comment.body || github.event.review.body || github.event.issue.body, '@gemini-cli')
       )
     runs-on: 'ubuntu-latest'
     permissions:
