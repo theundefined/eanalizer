@@ -31,6 +31,10 @@ def load_from_enea_csv(file_path: str) -> List[EnergyData]:
             },
         )
 
+        if "Data" not in df.columns:
+            print(f"Pominięto plik (nieprawidłowy format Enea CSV): {file_path}")
+            return []
+
         df.rename(
             columns={
                 "Data": "timestamp",
