@@ -9,39 +9,51 @@ from .config import AppConfig
 
 
 class EneaDownloader:
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, force: bool = False, report_only: bool = False):
         """Initializes the downloader with a complete application configuration."""
-        if not all([config.email, config.password, config.customer_id]):
-            raise ValueError("Enea credentials are not fully configured.")
         self.config = config
+        self.force = force
+        self.report_only = report_only
 
     def download_data(self):
         """
         Main method to perform the download of Enea energy data.
         """
-        # Ensure data directory exists
-        self.config.data_dir.mkdir(exist_ok=True)
+        if self.report_only:
+            self._report_data_ranges()
+            return
 
-        current_year = datetime.now().year
-        filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
+        if not all([self.config.email, self.config.password, self.config.customer_id]):
+            print("Dane logowania Enea nie są w pełni skonfigurowane. Pomijanie pobierania.")
+        else:
+            # Ensure data directory exists
+            self.config.data_dir.mkdir(exist_ok=True)
 
-        # Check if the file for the current year needs to be downloaded
-        if filename.is_file():
-            file_mod_time = datetime.fromtimestamp(filename.stat().st_mtime)
-            if datetime.now() - file_mod_time < timedelta(hours=1):
-                print(f"Plik {filename} jest nowszy niż 1 godzina. Kończenie.")
-                return
+            current_year = datetime.now().year
+            filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
+
+            # Check if the file for the current year needs to be downloaded
+            if not self.force and filename.is_file():
+                file_mod_time = datetime.fromtimestamp(filename.stat().st_mtime)
+                if datetime.now() - file_mod_time < timedelta(hours=1):
+                    print(f"Plik {filename} jest nowszy niż 1 godzina. Użyj --force aby wymusić pobranie.")
+                else:
+                    with open(filename, "r", encoding="utf-8") as f:
+                        try:
+                            content = f.read()
+                            if "---" not in content:
+                                print(f"Plik {filename} już istnieje i jest prawidłowy. Użyj --force aby wymusić pobranie.")
+                            else:
+                                self._run_download_process()
+                        except UnicodeDecodeError:
+                            self._run_download_process()
             else:
-                with open(filename, "r", encoding="utf-8") as f:
-                    try:
-                        content = f.read()
-                        if "---" not in content:
-                            print(f"Plik {filename} już istnieje i jest prawidłowy. Kończenie.")
-                            return
-                    except UnicodeDecodeError:
-                        pass  # File will be re-downloaded
+                self._run_download_process()
 
-        # URLs
+        self._report_data_ranges()
+
+    def _run_download_process(self):
+        """Internal method to execute the full download session."""
         login_url = "https://ebok.enea.pl/logowanie"
         summary_balancing_chart_url = "https://ebok.enea.pl/meter/summaryBalancingChart"
 
@@ -128,11 +140,33 @@ class EneaDownloader:
             for year in range(min_year, max_year + 1):
                 self._download_year_csv(session, year, point_of_delivery_id, summary_balancing_chart_url)
 
+    def _report_data_ranges(self):
+        """Lists all downloaded files and their data ranges."""
+        print("\nRaport zakresu danych na dysku:")
+        from .data_loader import load_from_enea_csv
+
+        # Find all Enea CSV files
+        files = list(self.config.data_dir.glob("*_dane_dobowo_godzinowe_*.csv"))
+        files.sort()
+
+        if not files:
+            print("Brak pobranych plików danych.")
+            return
+
+        for filename in files:
+            data = load_from_enea_csv(str(filename))
+            if data:
+                min_date = min(data, key=lambda x: x.timestamp).timestamp
+                max_date = max(data, key=lambda x: x.timestamp).timestamp
+                print(f"- {filename.name}: {min_date.strftime('%Y-%m-%d %H:%M')} do {max_date.strftime('%Y-%m-%d %H:%M')}")
+            else:
+                print(f"- {filename.name}: Błąd wczytywania lub brak rekordów.")
+
     def _download_year_csv(self, session, year, point_of_delivery_id, referer_url):
         filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{year}.csv"
 
-        # Skip if file is recent (only for current year) or valid
-        if filename.is_file():
+        # Skip if file is recent (only for current year) or valid, unless force is used
+        if not self.force and filename.is_file():
             if year == datetime.now().year:
                 if datetime.now() - datetime.fromtimestamp(filename.stat().st_mtime) < timedelta(hours=1):
                     print(f"Plik {filename} jest nowszy niż 1 godzina. Pomijanie.")
