@@ -14,10 +14,16 @@ def main():
         description="Pobiera dane o zużyciu energii z eBOK Enea i raportuje zakres danych na dysku."
     )
     parser.add_argument(
-        "-f", "--force", action="store_true", help="Wymusza ponowne pobranie danych, nawet jeśli są aktualne."
+        "-f",
+        "--force",
+        action="store_true",
+        help="Wymusza ponowne pobranie danych, nawet jeśli są aktualne.",
     )
     parser.add_argument(
-        "-r", "--report", action="store_true", help="Tylko wyświetla zakres danych z plików na dysku (bez pobierania)."
+        "-r",
+        "--report",
+        action="store_true",
+        help="Tylko wyświetla zakres danych z plików na dysku (bez pobierania).",
     )
 
     args = parser.parse_args()

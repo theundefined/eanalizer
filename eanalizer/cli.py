@@ -37,7 +37,9 @@ try:
         # e.g., 'en_US' -> 'en'
         language = lang_code.split("_")[0]
         # Find the .mo file
-        translation = gettext.translation(APP_NAME, localedir=LOCALE_DIR, languages=[language])
+        translation = gettext.translation(
+            APP_NAME, localedir=LOCALE_DIR, languages=[language]
+        )
         _ = translation.gettext
 except (FileNotFoundError, locale.Error, IndexError):
     # Fallback if the .mo file is not found, locale is not supported, or lang_code is empty
@@ -71,8 +73,12 @@ def main():
         default="G11",
         help=_("Specifies the energy tariff for a single analysis (default: G11)."),
     )
-    parser.add_argument("--data-start", help=_("Start date of the analysis (format YYYY-MM-DD)."))
-    parser.add_argument("--data-koniec", help=_("End date of the analysis (format YYYY-MM-DD)."))
+    parser.add_argument(
+        "--data-start", help=_("Start date of the analysis (format YYYY-MM-DD).")
+    )
+    parser.add_argument(
+        "--data-koniec", help=_("End date of the analysis (format YYYY-MM-DD).")
+    )
     parser.add_argument(
         "--magazyn-fizyczny",
         type=float,
@@ -82,7 +88,9 @@ def main():
         "--sprawnosc-magazynu",
         type=float,
         default=0.9,
-        help=_("Efficiency of the physical storage (round-trip, default: 0.90, i.e., 90%%)."),
+        help=_(
+            "Efficiency of the physical storage (round-trip, default: 0.90, i.e., 90%%)."
+        ),
     )
     parser.add_argument(
         "--eksport-symulacji",
@@ -151,7 +159,9 @@ def main():
     print(_("\nTotal loaded {} records.").format(len(all_energy_data)))
 
     # Data filtering
-    filtered_data = filter_data_by_date(all_energy_data, args.data_start, args.data_koniec)
+    filtered_data = filter_data_by_date(
+        all_energy_data, args.data_start, args.data_koniec
+    )
     if not filtered_data:
         print(_("No data in the given date range for further analysis."))
         return
@@ -160,18 +170,26 @@ def main():
 
     min_year = min(d.timestamp.year for d in filtered_data)
     max_year = max(d.timestamp.year for d in filtered_data)
-    tariff_manager = TariffManager(str(app_cfg.tariffs_file), years=range(min_year, max_year + 1))
+    tariff_manager = TariffManager(
+        str(app_cfg.tariffs_file), years=range(min_year, max_year + 1)
+    )
 
     # Determine analysis parameters
     net_metering_ratio = args.wspolczynnik_netmetering if args.z_netmetering else None
-    capacity = args.magazyn_fizyczny if args.magazyn_fizyczny and args.magazyn_fizyczny > 0 else 0.0
+    capacity = (
+        args.magazyn_fizyczny
+        if args.magazyn_fizyczny and args.magazyn_fizyczny > 0
+        else 0.0
+    )
     storage_efficiency = args.sprawnosc_magazynu
 
     # --- Main analysis logic ---
     if args.z_cenami_rce:
         start_date = filtered_data[0].timestamp
         end_date = filtered_data[-1].timestamp
-        hourly_prices = get_hourly_rce_prices(start_date, end_date, cache_dir=app_cfg.cache_dir)
+        hourly_prices = get_hourly_rce_prices(
+            start_date, end_date, cache_dir=app_cfg.cache_dir
+        )
         run_rce_analysis(filtered_data, hourly_prices)
     elif args.porownaj_taryfy:
         run_tariff_comparison(
@@ -199,7 +217,9 @@ def main():
         analyze_daily_trends(daily_data_df)
 
         if args.oblicz_optymalny_magazyn:
-            calculate_optimal_capacity(filtered_data, daily_data_df, tariff_manager, args.taryfa)
+            calculate_optimal_capacity(
+                filtered_data, daily_data_df, tariff_manager, args.taryfa
+            )
 
         if args.eksport_dzienny:
             export_to_csv(daily_data_df, args.eksport_dzienny)

@@ -9,7 +9,9 @@ from .config import AppConfig
 
 
 class EneaDownloader:
-    def __init__(self, config: AppConfig, force: bool = False, report_only: bool = False):
+    def __init__(
+        self, config: AppConfig, force: bool = False, report_only: bool = False
+    ):
         """Initializes the downloader with a complete application configuration."""
         self.config = config
         self.force = force
@@ -24,25 +26,34 @@ class EneaDownloader:
             return
 
         if not all([self.config.email, self.config.password, self.config.customer_id]):
-            print("Dane logowania Enea nie są w pełni skonfigurowane. Pomijanie pobierania.")
+            print(
+                "Dane logowania Enea nie są w pełni skonfigurowane. Pomijanie pobierania."
+            )
         else:
             # Ensure data directory exists
             self.config.data_dir.mkdir(exist_ok=True)
 
             current_year = datetime.now().year
-            filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
+            filename = (
+                self.config.data_dir
+                / f"{self.config.customer_id}_dane_dobowo_godzinowe_{current_year}.csv"
+            )
 
             # Check if the file for the current year needs to be downloaded
             if not self.force and filename.is_file():
                 file_mod_time = datetime.fromtimestamp(filename.stat().st_mtime)
                 if datetime.now() - file_mod_time < timedelta(hours=1):
-                    print(f"Plik {filename} jest nowszy niż 1 godzina. Użyj --force aby wymusić pobranie.")
+                    print(
+                        f"Plik {filename} jest nowszy niż 1 godzina. Użyj --force aby wymusić pobranie."
+                    )
                 else:
                     with open(filename, "r", encoding="utf-8") as f:
                         try:
                             content = f.read()
                             if "---" not in content:
-                                print(f"Plik {filename} już istnieje i jest prawidłowy. Użyj --force aby wymusić pobranie.")
+                                print(
+                                    f"Plik {filename} już istnieje i jest prawidłowy. Użyj --force aby wymusić pobranie."
+                                )
                             else:
                                 self._run_download_process()
                         except UnicodeDecodeError:
@@ -57,23 +68,26 @@ class EneaDownloader:
         login_url = "https://ebok.enea.pl/logowanie"
         summary_balancing_chart_url = "https://ebok.enea.pl/meter/summaryBalancingChart"
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
-            "Referer": login_url,
-        }
-
         with requests.Session() as session:
+            session.headers.update(
+                {
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+                }
+            )
+
             # Get CSRF token
             try:
                 print("Pobieranie strony logowania...")
-                login_page = session.get(login_url, headers=headers)
+                login_page = session.get(login_url)
                 login_page.raise_for_status()
                 token_match = re.search(r'name="token" value="(.*?)"', login_page.text)
                 if not token_match:
                     raise ConnectionError("Nie można znaleźć tokena CSRF.")
                 token = token_match.group(1)
             except requests.exceptions.RequestException as e:
-                raise ConnectionError(f"Błąd podczas pobierania strony logowania: {e}") from e
+                raise ConnectionError(
+                    f"Błąd podczas pobierania strony logowania: {e}"
+                ) from e
 
             # Login
             login_data = {
@@ -84,7 +98,9 @@ class EneaDownloader:
             }
             try:
                 print("Logowanie...")
-                login_response = session.post(login_url, data=login_data, headers=headers)
+                login_response = session.post(
+                    login_url, data=login_data, headers={"Referer": login_url}
+                )
                 login_response.raise_for_status()
             except requests.exceptions.RequestException as e:
                 raise ConnectionError(f"Błąd podczas logowania: {e}") from e
@@ -98,17 +114,23 @@ class EneaDownloader:
                     re.DOTALL,
                 )
                 if not client_guid_match:
-                    raise ValueError(f"Nie można znaleźć identyfikatora dla klienta {self.config.customer_id}")
+                    raise ValueError(
+                        f"Nie można znaleźć identyfikatora dla klienta {self.config.customer_id}"
+                    )
                 client_guid = client_guid_match.group(1)
             except Exception as e:
-                raise ValueError(f"Błąd podczas wyszukiwania identyfikatora klienta: {e}") from e
+                raise ValueError(
+                    f"Błąd podczas wyszukiwania identyfikatora klienta: {e}"
+                ) from e
 
             # Select client
             try:
                 print("Wybieranie klienta...")
-                headers["Referer"] = "https://ebok.enea.pl/dashboard/many-clients"
                 client_selection_url = f"https://ebok.enea.pl/dashboard/select-current-client/{client_guid}"
-                client_response = session.get(client_selection_url, headers=headers)
+                client_response = session.get(
+                    client_selection_url,
+                    headers={"Referer": "https://ebok.enea.pl/dashboard/many-clients"},
+                )
                 client_response.raise_for_status()
             except requests.exceptions.RequestException as e:
                 raise ConnectionError(f"Błąd podczas wybierania klienta: {e}") from e
@@ -116,17 +138,25 @@ class EneaDownloader:
             # Get pointOfDeliveryId and available years
             try:
                 print("Pobieranie danych o punkcie poboru i dostępnych latach...")
-                headers["Referer"] = "https://ebok.enea.pl/dashboard"
-                summary_page = session.get(summary_balancing_chart_url, headers=headers)
+                summary_page = session.get(
+                    summary_balancing_chart_url,
+                    headers={"Referer": "https://ebok.enea.pl/dashboard"},
+                )
                 summary_page.raise_for_status()
 
-                pod_id_match = re.search(r'data-point-of-delivery-id="(.*?)"', summary_page.text)
+                pod_id_match = re.search(
+                    r'data-point-of-delivery-id="(.*?)"', summary_page.text
+                )
                 if not pod_id_match:
                     raise ValueError("Nie można znaleźć pointOfDeliveryId.")
                 point_of_delivery_id = pod_id_match.group(1)
 
-                min_year_match = re.search(r'data-min-date-value="(\d{4})"', summary_page.text)
-                max_year_match = re.search(r'data-max-date-value="(\d{4})"', summary_page.text)
+                min_year_match = re.search(
+                    r'data-min-date-value="(\d{4})"', summary_page.text
+                )
+                max_year_match = re.search(
+                    r'data-max-date-value="(\d{4})"', summary_page.text
+                )
                 if not min_year_match or not max_year_match:
                     raise ValueError("Nie można znaleźć zakresu lat.")
 
@@ -138,7 +168,9 @@ class EneaDownloader:
 
             # Download CSV for each year
             for year in range(min_year, max_year + 1):
-                self._download_year_csv(session, year, point_of_delivery_id, summary_balancing_chart_url)
+                self._download_year_csv(
+                    session, year, point_of_delivery_id, summary_balancing_chart_url
+                )
 
     def _report_data_ranges(self):
         """Lists all downloaded files and their data ranges."""
@@ -158,17 +190,24 @@ class EneaDownloader:
             if data:
                 min_date = min(data, key=lambda x: x.timestamp).timestamp
                 max_date = max(data, key=lambda x: x.timestamp).timestamp
-                print(f"- {filename.name}: {min_date.strftime('%Y-%m-%d %H:%M')} do {max_date.strftime('%Y-%m-%d %H:%M')}")
+                print(
+                    f"- {filename.name}: {min_date.strftime('%Y-%m-%d %H:%M')} do {max_date.strftime('%Y-%m-%d %H:%M')}"
+                )
             else:
                 print(f"- {filename.name}: Błąd wczytywania lub brak rekordów.")
 
     def _download_year_csv(self, session, year, point_of_delivery_id, referer_url):
-        filename = self.config.data_dir / f"{self.config.customer_id}_dane_dobowo_godzinowe_{year}.csv"
+        filename = (
+            self.config.data_dir
+            / f"{self.config.customer_id}_dane_dobowo_godzinowe_{year}.csv"
+        )
 
         # Skip if file is recent (only for current year) or valid, unless force is used
         if not self.force and filename.is_file():
             if year == datetime.now().year:
-                if datetime.now() - datetime.fromtimestamp(filename.stat().st_mtime) < timedelta(hours=1):
+                if datetime.now() - datetime.fromtimestamp(
+                    filename.stat().st_mtime
+                ) < timedelta(hours=1):
                     print(f"Plik {filename} jest nowszy niż 1 godzina. Pomijanie.")
                     return
             with open(filename, "r", encoding="utf-8") as f:
@@ -182,9 +221,14 @@ class EneaDownloader:
             "pointOfDeliveryId": point_of_delivery_id,
         }
         try:
+            import time
+
+            time.sleep(1)  # Small delay to ensure session is ready
             print(f"Pobieranie CSV za rok {year}...")
-            headers = session.headers.copy()
-            headers["Referer"] = referer_url
+
+            # Use specific headers for this request, session will handle User-Agent and cookies
+            headers = {"Referer": referer_url, "X-Requested-With": "XMLHttpRequest"}
+
             csv_response = session.post(
                 "https://ebok.enea.pl/meter/summaryBalancingChart/csv",
                 data=csv_data,
@@ -192,16 +236,38 @@ class EneaDownloader:
             )
             csv_response.raise_for_status()
 
-            json_data = csv_response.json()
+            try:
+                json_data = csv_response.json()
+            except json.JSONDecodeError:
+                print(
+                    f"Błąd: Serwer nie zwrócił poprawnego JSON dla roku {year}. Prawdopodobne wygaśnięcie sesji."
+                )
+                if "<html" in csv_response.text.lower():
+                    print(
+                        "Otrzymano stronę HTML zamiast danych. Próba ponownego logowania może być wymagana."
+                    )
+                return
+
+            if "data" not in json_data:
+                print(
+                    f"Błąd: Brak klucza 'data' w odpowiedzi dla roku {year}. Odpowiedź: {json_data}"
+                )
+                return
+
             csv_content = json_data["data"]
 
-            with open(filename, "w") as f:
+            if not csv_content or len(csv_content.strip()) < 10:
+                print(
+                    f"Ostrzeżenie: Pobrane dane dla roku {year} są puste lub zbyt krótkie."
+                )
+                return
+
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write(csv_content)
             print(f"Pomyślnie zapisano {filename}")
 
         except (
             requests.exceptions.RequestException,
-            json.JSONDecodeError,
             KeyError,
         ) as e:
             print(f"Błąd podczas pobierania lub zapisywania danych za rok {year}: {e}")

@@ -20,10 +20,10 @@ translations = {
     "No .csv files found for processing in: {}": "Nie znaleziono plikow .csv do przetworzenia w: {}",
     "Found {} files to process:": "Znaleziono {} plikow do przetworzenia:",
     "Total loaded {} records.": "Lacznia wczytano {} rekordow.",
-    "No data in the given date range for further analysis.": "Brak danych w podanym zakresie dat do dalszej analizy."
+    "No data in the given date range for further analysis.": "Brak danych w podanym zakresie dat do dalszej analizy.",
 }
 
-po = polib.pofile('locales/pl/LC_MESSAGES/eanalizer.po')
+po = polib.pofile("locales/pl/LC_MESSAGES/eanalizer.po")
 
 print("Translating file: locales/pl/LC_MESSAGES/eanalizer.po")
 untranslated = []
