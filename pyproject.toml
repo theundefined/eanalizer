@@ -1,6 +1,6 @@
 [project]
 name = "eanalizer"
-version = "0.3.8"
+version = "0.3.9"
 description = "Aplikacja do analizy zużycia energii elektrycznej z danych od operatora Enea."
 authors = [{ name = "TheUndefined" }]
 readme = "README.md"
