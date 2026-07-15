@@ -13,6 +13,7 @@ import pandas as pd
 from eanalizer.core import (
     run_rce_analysis,
     run_full_analysis,
+    run_tariff_comparison,
     print_analysis_summary,
     calculate_optimal_capacity,
     find_missing_hours,
@@ -320,3 +321,41 @@ class TestCoreFunctionality(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("Brak danych dla godziny: 2023-06-15 10:00", output)
         self.assertNotIn("prawdopodobnie zmiana czasu", output)
+
+    def test_tariff_comparison_shows_cost_breakdown(self):
+        """
+        Porównanie taryf powinno pokazywać rozbicie na koszt energii i opłaty
+        stałe (abonament), a nie tylko sumę całkowitą.
+        """
+        expected_summary, _ = run_full_analysis(
+            data=self.test_data,
+            capacity=0,
+            tariff_manager=self.tariff_manager,
+            tariff="G12w",
+            net_metering_ratio=None,
+            storage_efficiency=1.0,
+        )
+        expected_total = expected_summary["calkowity_koszt"]
+        expected_fixed = expected_summary["oplaty_stale"]
+        expected_energy = expected_total - expected_fixed
+
+        import sys
+        from io import StringIO
+
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        run_tariff_comparison(
+            data=self.test_data,
+            tariff_manager=self.tariff_manager,
+            capacity=0,
+            net_metering_ratio=None,
+            storage_efficiency=1.0,
+        )
+        sys.stdout = original_stdout
+        output = captured_output.getvalue()
+
+        self.assertIn(
+            f"Taryfa G12w : {expected_total:>10.2f} zł "
+            f"(energia: {expected_energy:>9.2f} zł, opłaty stałe: {expected_fixed:>8.2f} zł)",
+            output,
+        )

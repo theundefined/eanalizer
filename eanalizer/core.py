@@ -226,6 +226,7 @@ def run_tariff_comparison(
     """
     all_tariffs = tariff_manager.get_all_tariffs()
     results = {}
+    breakdown = {}
     header = "--- Porównanie taryf ---"
     if capacity > 0:
         header = f"--- Porównanie taryf z magazynem fizycznym ({capacity} kWh, sprawność {int(storage_efficiency*100)}%) ---"
@@ -250,7 +251,13 @@ def run_tariff_comparison(
 
         cost = summary.get("calkowity_koszt")
         if cost is not None:
+            oplaty_stale = summary.get("oplaty_stale", 0.0)
             results[tariff] = cost
+            breakdown[tariff] = {
+                "calkowity_koszt": cost,
+                "koszt_energii": cost - oplaty_stale,
+                "oplaty_stale": oplaty_stale,
+            }
 
     sorted_results = sorted(results.items(), key=lambda item: item[1])
 
@@ -264,7 +271,11 @@ def run_tariff_comparison(
         print(f"Uwzględniono net-metering ze współczynnikiem {net_metering_ratio}")
     print("---------------------------------------------")
     for tariff, cost in sorted_results:
-        print(f"Taryfa {tariff:<5}: {cost:>10.2f} zł")
+        b = breakdown[tariff]
+        print(
+            f"Taryfa {tariff:<5}: {b['calkowity_koszt']:>10.2f} zł "
+            f"(energia: {b['koszt_energii']:>9.2f} zł, opłaty stałe: {b['oplaty_stale']:>8.2f} zł)"
+        )
     print("---------------------------------------------")
 
     if sorted_results:
