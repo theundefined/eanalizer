@@ -47,12 +47,16 @@ def get_hourly_rce_prices(
                 daily_data = json.load(f)
         elif current_date >= DATA_START_DATE:
             daily_data = _fetch_daily_rce_from_api(date_str)
-            if daily_data:
+            if daily_data is None:
+                # Pobieranie się nie powiodło (błąd sieci/API) - nie zapisujemy
+                # do cache, aby kolejne uruchomienie mogło spróbować ponownie.
+                print(
+                    f"Nie udało się pobrać cen RCE dla {date_str}; dzień zostanie pominięty w tym uruchomieniu."
+                )
+            else:
+                # Udane zapytanie, nawet jeśli nie ma jeszcze opublikowanych cen.
                 with open(cache_path, "w") as f:
                     json.dump(daily_data, f)
-            else:
-                with open(cache_path, "w") as f:
-                    json.dump([], f)
 
         if daily_data:
             df = pd.DataFrame(daily_data)

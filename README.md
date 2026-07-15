@@ -100,13 +100,15 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 | `--eksport-dzienny <plik.csv>`    |       | Eksportuje zagregowane dane dzienne do pliku CSV.                                                     |
 | `--verbose`                       | `-v`  | Włącza tryb szczegółowy, np. dla porównania taryf.                                                  |
 
+> **Uwaga:** `--z-cenami-rce` nie obsługuje symulacji magazynu ani net-meteringu (`--magazyn-fizyczny`, `--z-netmetering`, `--sprawnosc-magazynu`) ani eksportu/obliczania optymalnego magazynu. `--porownaj-taryfy` nie obsługuje eksportu ani obliczania optymalnego magazynu. Te flagi, jeśli podane w niewspieranym trybie, zostaną zignorowane, o czym program wypisze stosowne ostrzeżenie.
+
 ## Rozwój i Testowanie
 
 Repozytorium jest skonfigurowane do pracy z `pre-commit` w celu automatycznego formatowania i sprawdzania kodu.
 
 1.  **Instalacja narzędzi deweloperskich:**
     ```bash
-    .venv/bin/pip install -r requirements-dev.txt
+    .venv/bin/pip install -e ".[dev]"
     ```
 2.  **Instalacja pre-commit hook:**
     ```bash

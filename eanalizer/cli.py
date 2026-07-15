@@ -185,6 +185,21 @@ def main():
 
     # --- Main analysis logic ---
     if args.z_cenami_rce:
+        if capacity > 0 or net_metering_ratio is not None:
+            print(
+                _(
+                    "Uwaga: tryb --z-cenami-rce nie obsługuje symulacji magazynu ani "
+                    "net-meteringu; flagi --magazyn-fizyczny/--z-netmetering/"
+                    "--sprawnosc-magazynu zostaną zignorowane."
+                )
+            )
+        if args.oblicz_optymalny_magazyn or args.eksport_dzienny or args.eksport_symulacji:
+            print(
+                _(
+                    "Uwaga: tryb --z-cenami-rce nie obsługuje eksportu danych ani "
+                    "obliczania optymalnego magazynu; te opcje zostaną zignorowane."
+                )
+            )
         start_date = filtered_data[0].timestamp
         end_date = filtered_data[-1].timestamp
         hourly_prices = get_hourly_rce_prices(
@@ -192,6 +207,13 @@ def main():
         )
         run_rce_analysis(filtered_data, hourly_prices)
     elif args.porownaj_taryfy:
+        if args.oblicz_optymalny_magazyn or args.eksport_dzienny or args.eksport_symulacji:
+            print(
+                _(
+                    "Uwaga: tryb --porownaj-taryfy nie obsługuje eksportu danych ani "
+                    "obliczania optymalnego magazynu; te opcje zostaną zignorowane."
+                )
+            )
         run_tariff_comparison(
             data=filtered_data,
             tariff_manager=tariff_manager,

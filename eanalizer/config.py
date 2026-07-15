@@ -68,28 +68,41 @@ class AppConfig:
             parser.write(f)
 
 
+def _get_dev_root() -> Optional[Path]:
+    """
+    Returns the repository root if this package is running from an
+    editable/source checkout (this file's own directory tree), or None if
+    it's running from an installed package (e.g. via pipx).
+    Based on the package's own location, not the process's current working
+    directory, so it isn't fooled by an unrelated pyproject.toml in whatever
+    directory the user happens to invoke the command from.
+    """
+    package_root = Path(__file__).resolve().parent.parent
+    return package_root if package_root.joinpath("pyproject.toml").is_file() else None
+
+
 def _get_default_dir(dir_type: str) -> Path:
     """
     Determines the default path for app directories based on environment.
     """
-    is_dev_env = Path.cwd().joinpath("pyproject.toml").is_file()
+    dev_root = _get_dev_root()
 
     if dir_type == "config":
         return (
-            Path.cwd() / "config"
-            if is_dev_env
+            dev_root / "config"
+            if dev_root
             else Path(platformdirs.user_config_dir(APP_NAME, appauthor=False))
         )
     if dir_type == "data":
         return (
-            Path.cwd() / "data"
-            if is_dev_env
+            dev_root / "data"
+            if dev_root
             else Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
         )
     if dir_type == "cache":
         return (
-            Path.cwd() / "cache"
-            if is_dev_env
+            dev_root / "cache"
+            if dev_root
             else Path(platformdirs.user_cache_dir(APP_NAME, appauthor=False))
         )
 

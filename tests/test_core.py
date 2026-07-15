@@ -15,6 +15,7 @@ from eanalizer.core import (
     run_full_analysis,
     print_analysis_summary,
     calculate_optimal_capacity,
+    find_missing_hours,
 )
 from eanalizer.tariffs import TariffManager
 from eanalizer.models import EnergyData
@@ -124,6 +125,51 @@ class TestCoreFunctionality(unittest.TestCase):
         self.assertIn("SUMARYCZNY KOSZT energii pobranej: 0.40 zł", output)
         self.assertIn("SUMARYCZNY PRZYCHÓD z energii oddanej: 1.75 zł", output)
 
+    @patch("urllib.request.urlopen")
+    def test_rce_fetch_failure_is_not_cached(self, mock_urlopen):
+        """
+        Testuje, że nieudane pobranie cen RCE (błąd sieci/API) nie jest trwale
+        zapisywane w cache jako pusty wynik - kolejne uruchomienie musi
+        spróbować pobrać dane ponownie, zamiast na stałe zakładać ich brak.
+        """
+        test_date_str = "2024-08-01"
+        cache_file = self.test_config.cache_dir / f"{test_date_str}.json"
+        if cache_file.exists():
+            cache_file.unlink()
+
+        mock_urlopen.side_effect = ConnectionError("Connection error")
+        prices = get_hourly_rce_prices(
+            datetime(2024, 8, 1),
+            datetime(2024, 8, 1),
+            cache_dir=self.test_config.cache_dir,
+        )
+        self.assertEqual(prices, {})
+        self.assertFalse(cache_file.exists())
+
+        # Kolejne uruchomienie (np. po odzyskaniu łączności) musi ponownie
+        # spróbować pobrać dane, a nie polegać na trwale "zatrutym" cache.
+        mock_urlopen.side_effect = None
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {
+                "value": [
+                    {"dtime": "2024-08-01 00:15:00", "rce_pln": 400.0},
+                    {"dtime": "2024-08-01 00:30:00", "rce_pln": 400.0},
+                ]
+            }
+        ).encode()
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        prices = get_hourly_rce_prices(
+            datetime(2024, 8, 1),
+            datetime(2024, 8, 1),
+            cache_dir=self.test_config.cache_dir,
+        )
+        self.assertEqual(mock_urlopen.call_count, 2)
+        self.assertTrue(cache_file.exists())
+        self.assertIn(datetime(2024, 8, 1, 0, 0), prices)
+
     def test_net_metering_cascade_logic(self):
         """Testuje kaskadową logikę rozliczeń net-metering między strefami."""
         test_data = [self.test_data[3], self.test_data[2]]
@@ -215,3 +261,62 @@ class TestCoreFunctionality(unittest.TestCase):
         # The capacity for arbitrage should still be 5.0, as this is the consumption
         # in the high-price zone that could be shifted.
         self.assertIn("Pojemność wymagana dla arbitrażu taryfowego: 5.000 kWh", output)
+
+    def test_find_missing_hours_annotates_dst_spring_gap(self):
+        """
+        Brak godziny w dniu zmiany czasu na letni (ostatnia niedziela marca) powinien
+        być oznaczony jako prawdopodobnie oczekiwany, a nie zwykły błąd w danych.
+        """
+        # 2023-03-26 to ostatnia niedziela marca (zmiana czasu); godzina 01:00 nie istnieje.
+        test_data = [
+            EnergyData(
+                timestamp=datetime(2023, 3, 26, hour),
+                pobor_przed=0,
+                oddanie_przed=0,
+                pobor=0,
+                oddanie=0,
+            )
+            for hour in range(24)
+            if hour != 1
+        ]
+
+        import sys
+        from io import StringIO
+
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        find_missing_hours(test_data, "2023-03-26", "2023-03-26")
+        sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+        self.assertIn("Brak danych dla godziny: 2023-03-26 01:00", output)
+        self.assertIn(
+            "2023-03-26 01:00 (prawdopodobnie zmiana czasu na letni, a nie błąd w danych)",
+            output,
+        )
+
+    def test_find_missing_hours_does_not_annotate_regular_gap(self):
+        """Zwykły brak danych (poza dniem zmiany czasu) nie powinien mieć adnotacji o DST."""
+        test_data = [
+            EnergyData(
+                timestamp=datetime(2023, 6, 15, hour),
+                pobor_przed=0,
+                oddanie_przed=0,
+                pobor=0,
+                oddanie=0,
+            )
+            for hour in range(24)
+            if hour != 10
+        ]
+
+        import sys
+        from io import StringIO
+
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        find_missing_hours(test_data, "2023-06-15", "2023-06-15")
+        sys.stdout = original_stdout
+
+        output = captured_output.getvalue()
+        self.assertIn("Brak danych dla godziny: 2023-06-15 10:00", output)
+        self.assertNotIn("prawdopodobnie zmiana czasu", output)

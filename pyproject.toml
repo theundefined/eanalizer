@@ -1,17 +1,17 @@
 [project]
 name = "eanalizer"
 version = "0.3.7"
-description = "Aplikacja do analizy zużycia energii elektrycznej z danych od operatorów (Enea, Tauron)."
+description = "Aplikacja do analizy zużycia energii elektrycznej z danych od operatora Enea."
 authors = [{ name = "TheUndefined" }]
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.8"
-keywords = ["enea", "energy", "analiza", "fotowoltaika", "tauron"]
+keywords = ["enea", "energy", "analiza", "fotowoltaika"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -39,6 +39,8 @@ enea-downloader = "eanalizer.downloader_cli:main"
 [project.optional-dependencies]
 dev = [
     "Babel",
+    "ruff",
+    "pre-commit",
 ]
 
 [tool.setuptools]

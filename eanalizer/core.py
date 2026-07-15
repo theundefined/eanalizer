@@ -439,6 +439,20 @@ def analyze_daily_trends(daily_df: pd.DataFrame):
     print("-----------------------------------")
 
 
+def _is_probable_dst_spring_gap(ts: pd.Timestamp) -> bool:
+    """
+    Sprawdza, czy dana godzina przypada na ostatnią niedzielę marca (zmiana czasu
+    na letni w Polsce), kiedy to jedna godzina zegarowa fizycznie nie istnieje.
+    Dane od Enei zwykle mają w tym dniu jeden brakujący rekord godzinowy, co jest
+    oczekiwane, a nie błędem w danych.
+    """
+    last_day_of_march = pd.Timestamp(year=ts.year, month=3, day=31)
+    last_sunday = last_day_of_march - pd.Timedelta(
+        days=(last_day_of_march.weekday() - 6) % 7
+    )
+    return ts.date() == last_sunday.date()
+
+
 def find_missing_hours(
     data: List[EnergyData], start_date_str: Optional[str], end_date_str: Optional[str]
 ):
@@ -460,7 +474,12 @@ def find_missing_hours(
                 f"Wykryto {len(missing_timestamps)} brakujących godzin. Wyświetlanie może być skrócone."
             )
         for ts in missing_timestamps[:24]:
-            print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}")
+            note = (
+                " (prawdopodobnie zmiana czasu na letni, a nie błąd w danych)"
+                if _is_probable_dst_spring_gap(ts)
+                else ""
+            )
+            print(f"Brak danych dla godziny: {ts.strftime('%Y-%m-%d %H:%M')}{note}")
         if len(missing_timestamps) > 24:
             print("...")
         print("-------------------------------------------------")
