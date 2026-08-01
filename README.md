@@ -38,6 +38,18 @@ Dane o zużyciu energii w formacie CSV można pozyskać na dwa sposoby:
 1.  **Manualnie**: Pobierz pliki z danymi godzinowymi z portalu [Enea eBOK](https://ebok.enea.pl/meter/summaryBalancingChart) i umieść je w katalogu danych `eanalizer`.
 2.  **Automatycznie**: Użyj dołączonego skryptu `enea-downloader-cli`, który po podaniu danych logowania do eBOK Enei automatycznie pobierze i zapisze wszystkie dostępne dane.
 
+    Logowanie Enea wymaga weryfikacji dwuskładnikowej (kod SMS lub e-mail) - `enea-downloader-cli` poprosi o wpisanie kodu w terminalu. Po udanym logowaniu sesja jest zapisywana w katalogu cache, więc kolejne uruchomienia mogą pominąć logowanie i 2FA, dopóki zapisana sesja pozostaje ważna.
+
+    ```bash
+    ./enea-downloader-cli
+    ```
+
+    | Flaga       | Skrót | Opis                                                                                                   |
+    | ----------- | ----- | -------------------------------------------------------------------------------------------------------- |
+    | `--force`   | `-f`  | Wymusza ponowne pobranie danych, nawet jeśli są aktualne.                                                  |
+    | `--report`  | `-r`  | Tylko wyświetla zakres danych z plików na dysku (bez pobierania).                                          |
+    | `--debug`   |       | Wypisuje dodatkowe informacje diagnostyczne o logowaniu i zapisuje zrzut ciasteczek sesji (nazwa/domena/wygaśnięcie) do katalogu cache. |
+
 ## Lokalizacja plików konfiguracyjnych i danych
 
 Program `eanalizer` przechowuje swoje pliki w standardowych lokalizacjach systemowych:

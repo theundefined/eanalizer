@@ -9,6 +9,8 @@ from typing import Optional
 import platformdirs
 import requests
 
+from . import enea_auth
+
 APP_NAME = "eanalizer"
 CONFIG_FILE_NAME = "config.ini"
 DEFAULT_TARIFFS_FILE = "tariffs.csv"
@@ -150,33 +152,14 @@ def _prompt_for_enea_credentials() -> dict:
 
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
-        "Referer": "https://ebok.enea.pl/logowanie",
     }
     with requests.Session() as session:
+        session.headers.update(headers)
         try:
-            login_page = session.get("https://ebok.enea.pl/logowanie", headers=headers)
-            login_page.raise_for_status()
-            token_match = re.search(r'name="token" value="(.*?)"', login_page.text)
-            if not token_match:
-                raise ConnectionError(
-                    "Blad: Nie mozna znalezc tokena CSRF na stronie logowania."
-                )
-            token = token_match.group(1)
-
-            login_data = {
-                "email": email,
-                "password": password,
-                "token": token,
-                "btnSubmit": "",
-            }
-            login_response = session.post(
-                "https://ebok.enea.pl/logowanie", data=login_data, headers=headers
+            login_page = session.get(enea_auth.LOGIN_URL)
+            login_response = enea_auth.interactive_login(
+                session, email, password, login_page
             )
-            login_response.raise_for_status()
-            if "Lista kontrahentów" not in login_response.text:
-                raise ValueError(
-                    "Logowanie nie powiodlo sie. Sprawdz swoje dane uwierzytelniajace."
-                )
 
             customers = re.findall(
                 r'<span>\s*(\d+)\s*</span>.*?href="/dashboard/select-current-client/([a-f0-9\-]+)"',

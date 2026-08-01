@@ -20,8 +20,14 @@ dist/
 # Pliki danych użytkownika
 data/
 
+# Cache (ceny RCE, zapisana sesja logowania Enea z ciasteczkami)
+cache/
+
 # plik z credentalami do pobierania danych z enea
 config.ini
+
+# zrzuty curl/DevTools z hasłami i tokenami sesji, używane do debugowania logowania
+curls/
 
 # Gemini related files
 .gemini/

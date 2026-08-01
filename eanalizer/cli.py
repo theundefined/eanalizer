@@ -193,7 +193,11 @@ def main():
                     "--sprawnosc-magazynu zostaną zignorowane."
                 )
             )
-        if args.oblicz_optymalny_magazyn or args.eksport_dzienny or args.eksport_symulacji:
+        if (
+            args.oblicz_optymalny_magazyn
+            or args.eksport_dzienny
+            or args.eksport_symulacji
+        ):
             print(
                 _(
                     "Uwaga: tryb --z-cenami-rce nie obsługuje eksportu danych ani "
@@ -207,7 +211,11 @@ def main():
         )
         run_rce_analysis(filtered_data, hourly_prices)
     elif args.porownaj_taryfy:
-        if args.oblicz_optymalny_magazyn or args.eksport_dzienny or args.eksport_symulacji:
+        if (
+            args.oblicz_optymalny_magazyn
+            or args.eksport_dzienny
+            or args.eksport_symulacji
+        ):
             print(
                 _(
                     "Uwaga: tryb --porownaj-taryfy nie obsługuje eksportu danych ani "

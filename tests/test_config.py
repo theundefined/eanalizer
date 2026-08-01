@@ -4,9 +4,15 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from eanalizer.config import AppConfig, _get_default_dir, _get_dev_root, load_config
+from eanalizer.config import (
+    AppConfig,
+    _get_default_dir,
+    _get_dev_root,
+    _prompt_for_enea_credentials,
+    load_config,
+)
 
 
 class TestAppConfig(unittest.TestCase):
@@ -89,7 +95,9 @@ class TestGetDefaultDir(unittest.TestCase):
 
         fake_project = Path(tempfile.mkdtemp())
         try:
-            (fake_project / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+            (fake_project / "pyproject.toml").write_text(
+                "[project]\n", encoding="utf-8"
+            )
             original_cwd = os.getcwd()
             os.chdir(fake_project)
             try:
@@ -165,6 +173,79 @@ class TestLoadConfig(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             load_config(require_credentials=True, prompt_for_missing=False)
+
+
+class TestPromptForEneaCredentials(unittest.TestCase):
+    @patch("builtins.input")
+    @patch("eanalizer.config.getpass.getpass", return_value="secret")
+    @patch("eanalizer.config.requests.Session")
+    def test_single_valid_customer_selected_automatically(
+        self, mock_session_class, mock_getpass, mock_input
+    ):
+        mock_session = MagicMock()
+        mock_session.__enter__.return_value = mock_session
+        mock_session_class.return_value = mock_session
+
+        # Nowy flow logowania Enea (OIDC/eumowy.enea.pl + kod 2FA) - patrz enea_auth.py.
+        login_page = MagicMock(
+            url=(
+                "https://eumowy.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
+                "scope=openid+profile+phone&state=abc123"
+            )
+        )
+        login_api_resp = MagicMock(status_code=200)
+        code_check_resp = MagicMock(status_code=200)
+        final_login_resp = MagicMock(
+            url="https://ebok.enea.pl/dashboard/many-clients",
+            text=(
+                "<span>12345</span>"
+                '<a href="/dashboard/select-current-client/'
+                'aabbccdd-1122-3344-5566-778899aabbcc">wybierz</a>'
+            ),
+        )
+        client_select_resp = MagicMock()
+        summary_page = MagicMock(text='data-point-of-delivery-id="POD123"')
+
+        mock_session.get.side_effect = [
+            login_page,
+            final_login_resp,
+            client_select_resp,
+            summary_page,
+        ]
+        mock_session.post.side_effect = [login_api_resp, code_check_resp]
+        # Kolejne wywołania input(): najpierw email, potem kod weryfikacyjny 2FA.
+        mock_input.side_effect = ["user@example.com", "123456"]
+
+        creds = _prompt_for_enea_credentials()
+
+        self.assertEqual(
+            creds,
+            {
+                "email": "user@example.com",
+                "password": "secret",
+                "customer_id": "12345",
+            },
+        )
+
+    @patch("builtins.input", return_value="user@example.com")
+    @patch("eanalizer.config.getpass.getpass", return_value="secret")
+    @patch("eanalizer.config.requests.Session")
+    def test_raises_system_exit_when_no_customers_found(
+        self, mock_session_class, mock_getpass, mock_input
+    ):
+        mock_session = MagicMock()
+        mock_session.__enter__.return_value = mock_session
+        mock_session_class.return_value = mock_session
+
+        # Sesja już zalogowana (np. z zapisanych ciasteczek) - brak profili klientów w treści.
+        authenticated_resp = MagicMock(
+            url="https://ebok.enea.pl/dashboard/many-clients", text=""
+        )
+        mock_session.get.return_value = authenticated_resp
+
+        with self.assertRaises(SystemExit):
+            _prompt_for_enea_credentials()
 
 
 if __name__ == "__main__":

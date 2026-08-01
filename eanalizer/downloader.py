@@ -1,21 +1,29 @@
 # eanalizer/downloader.py
 
+import http.cookiejar
 import json
 import re
-import requests
 from datetime import datetime, timedelta
 
+import requests
+
+from . import enea_auth
 from .config import AppConfig
 
 
 class EneaDownloader:
     def __init__(
-        self, config: AppConfig, force: bool = False, report_only: bool = False
+        self,
+        config: AppConfig,
+        force: bool = False,
+        report_only: bool = False,
+        debug: bool = False,
     ):
         """Initializes the downloader with a complete application configuration."""
         self.config = config
         self.force = force
         self.report_only = report_only
+        self.debug = debug
 
     def download_data(self):
         """
@@ -63,9 +71,92 @@ class EneaDownloader:
 
         self._report_data_ranges()
 
+    @property
+    def _cookie_jar_path(self):
+        return self.config.cache_dir / "enea_session_cookies.txt"
+
+    def _load_session_cookies(self, session):
+        """Wczytuje zapisaną sesję (jeśli istnieje) do bieżącego requests.Session."""
+        path = self._cookie_jar_path
+        if not path.is_file():
+            return False
+        jar = http.cookiejar.LWPCookieJar(str(path))
+        try:
+            jar.load(ignore_discard=True, ignore_expires=True)
+        except (OSError, http.cookiejar.LoadError):
+            return False
+        session.cookies.update(jar)
+        if self.debug:
+            print(f"[debug] Wczytano zapisaną sesję ({len(jar)} ciasteczek) z {path}")
+        return True
+
+    def _save_session_cookies(self, session):
+        """Zapisuje bieżące ciasteczka sesji, by pominąć logowanie/2FA przy kolejnym uruchomieniu."""
+        jar = http.cookiejar.LWPCookieJar(str(self._cookie_jar_path))
+        for cookie in session.cookies:
+            jar.set_cookie(cookie)
+        jar.save(ignore_discard=True, ignore_expires=True)
+        if self.debug:
+            print(
+                f"[debug] Zapisano sesję ({len(jar)} ciasteczek) do {self._cookie_jar_path}"
+            )
+            self._dump_cookie_debug_info(jar)
+
+    def _dump_cookie_debug_info(self, jar):
+        """Zapisuje czytelny zrzut ciasteczek (nazwa/domena/wygaśnięcie/HttpOnly) do analizy."""
+        info = []
+        for cookie in jar:
+            http_only = any(
+                key.lower() == "httponly" for key in getattr(cookie, "_rest", {})
+            )
+            info.append(
+                {
+                    "name": cookie.name,
+                    "domain": cookie.domain,
+                    "path": cookie.path,
+                    "expires": cookie.expires,
+                    "expires_iso": (
+                        datetime.fromtimestamp(cookie.expires).isoformat()
+                        if cookie.expires
+                        else None
+                    ),
+                    "discard": cookie.discard,
+                    "secure": cookie.secure,
+                    "http_only": http_only,
+                }
+            )
+        debug_path = self.config.cache_dir / "enea_cookie_debug.json"
+        debug_path.write_text(
+            json.dumps(info, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"[debug] Zrzut informacji o ciasteczkach: {debug_path}")
+
+    def _ensure_authenticated(self, session):
+        """
+        Zapewnia zalogowaną sesję: najpierw próbuje odtworzyć zapisaną wcześniej
+        sesję (bez logowania/2FA), a dopiero gdy to się nie uda - przechodzi
+        przez pełny interaktywny login + weryfikację dwuskładnikową
+        (eanalizer.enea_auth.interactive_login).
+        """
+        self._load_session_cookies(session)
+        response = session.get(enea_auth.LOGIN_URL)
+        if enea_auth.looks_authenticated(response):
+            print("Wykorzystano zapisaną sesję logowania - pominięto logowanie i 2FA.")
+            return response
+
+        if self.debug:
+            print(
+                f"[debug] Zapisana sesja nieaktualna lub jej brak (trafiono na {response.url}) "
+                "- wymagane pełne logowanie."
+            )
+        response = enea_auth.interactive_login(
+            session, self.config.email, self.config.password, response
+        )
+        self._save_session_cookies(session)
+        return response
+
     def _run_download_process(self):
         """Internal method to execute the full download session."""
-        login_url = "https://ebok.enea.pl/logowanie"
         summary_balancing_chart_url = "https://ebok.enea.pl/meter/summaryBalancingChart"
 
         with requests.Session() as session:
@@ -75,33 +166,8 @@ class EneaDownloader:
                 }
             )
 
-            # Get CSRF token
             try:
-                print("Pobieranie strony logowania...")
-                login_page = session.get(login_url)
-                login_page.raise_for_status()
-                token_match = re.search(r'name="token" value="(.*?)"', login_page.text)
-                if not token_match:
-                    raise ConnectionError("Nie można znaleźć tokena CSRF.")
-                token = token_match.group(1)
-            except requests.exceptions.RequestException as e:
-                raise ConnectionError(
-                    f"Błąd podczas pobierania strony logowania: {e}"
-                ) from e
-
-            # Login
-            login_data = {
-                "email": self.config.email,
-                "password": self.config.password,
-                "token": token,
-                "btnSubmit": "",
-            }
-            try:
-                print("Logowanie...")
-                login_response = session.post(
-                    login_url, data=login_data, headers={"Referer": login_url}
-                )
-                login_response.raise_for_status()
+                login_response = self._ensure_authenticated(session)
             except requests.exceptions.RequestException as e:
                 raise ConnectionError(f"Błąd podczas logowania: {e}") from e
 

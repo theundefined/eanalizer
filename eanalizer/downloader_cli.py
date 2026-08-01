@@ -25,6 +25,12 @@ def main():
         action="store_true",
         help="Tylko wyświetla zakres danych z plików na dysku (bez pobierania).",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Wypisuje dodatkowe informacje diagnostyczne o logowaniu i zapisuje "
+        "zrzut ciasteczek sesji (nazwa/domena/wygaśnięcie) do katalogu cache.",
+    )
 
     args = parser.parse_args()
 
@@ -33,7 +39,9 @@ def main():
         app_cfg = load_config(require_credentials=not args.report)
 
         # Instantiate the downloader with the loaded config and run it.
-        downloader = EneaDownloader(app_cfg, force=args.force, report_only=args.report)
+        downloader = EneaDownloader(
+            app_cfg, force=args.force, report_only=args.report, debug=args.debug
+        )
         downloader.download_data()
 
     except (ValueError, ConnectionError, SystemExit) as e:
