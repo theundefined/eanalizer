@@ -45,3 +45,12 @@ dev = [
 
 [tool.setuptools]
 packages = ["eanalizer"]
+
+[tool.ruff.lint]
+# Jawnie ograniczone do klasycznego zestawu domyślnego ruff (błędy
+# pycodestyle + pyflakes) - bez tego "ruff check ." w CI stosuje cokolwiek
+# jest bieżącym domyślnym zestawem reguł zainstalowanej (niepinowanej)
+# wersji ruff, co może w każdej chwili zacząć zgłaszać nowe kategorie
+# ostrzeżeń (DTZ, BLE, FA, SIM, ...) niezwiązane ze zmianą, która akurat
+# trafia do CI.
+select = ["E4", "E7", "E9", "F"]
