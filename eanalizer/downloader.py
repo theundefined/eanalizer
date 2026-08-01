@@ -167,16 +167,24 @@ class EneaDownloader:
             )
 
             try:
-                login_response = self._ensure_authenticated(session)
+                self._ensure_authenticated(session)
             except requests.exceptions.RequestException as e:
                 raise ConnectionError(f"Błąd podczas logowania: {e}") from e
 
-            # Get client GUID
+            # Get client GUID. Pobieramy dedykowaną stronę wyboru klienta zamiast
+            # polegać na tym, gdzie akurat wylądowaliśmy po (re)autoryzacji - przy
+            # wznowionej sesji (z zapisanych ciasteczek) serwer potrafi przekierować
+            # od razu na /dashboard (z zapamiętanym "current client"), pomijając
+            # /dashboard/many-clients, na którym opiera się poniższy regex.
             try:
                 print("Wyszukiwanie identyfikatora klienta...")
+                many_clients_response = session.get(
+                    "https://ebok.enea.pl/dashboard/many-clients"
+                )
+                many_clients_response.raise_for_status()
                 client_guid_match = re.search(
                     rf'<span>\s*{self.config.customer_id}\s*</span>.*?href="/dashboard/select-current-client/([a-f0-9\-]+)"',
-                    login_response.text,
+                    many_clients_response.text,
                     re.DOTALL,
                 )
                 if not client_guid_match:

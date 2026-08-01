@@ -196,8 +196,8 @@ class TestPromptForEneaCredentials(unittest.TestCase):
         )
         login_api_resp = MagicMock(status_code=200)
         code_check_resp = MagicMock(status_code=200)
-        final_login_resp = MagicMock(
-            url="https://ebok.enea.pl/dashboard/many-clients",
+        final_login_resp = MagicMock(url="https://ebok.enea.pl/dashboard/many-clients")
+        many_clients_resp = MagicMock(
             text=(
                 "<span>12345</span>"
                 '<a href="/dashboard/select-current-client/'
@@ -210,6 +210,7 @@ class TestPromptForEneaCredentials(unittest.TestCase):
         mock_session.get.side_effect = [
             login_page,
             final_login_resp,
+            many_clients_resp,
             client_select_resp,
             summary_page,
         ]

@@ -117,8 +117,10 @@ class TestEneaDownloader(unittest.TestCase):
         )
         login_api_resp = MagicMock(status_code=200)
         code_check_resp = MagicMock(status_code=200)
-        final_login_resp = MagicMock(
-            url="https://ebok.enea.pl/dashboard/many-clients",
+        # Odpowiedź kończąca logowanie - jej treść nie ma już znaczenia, liczy
+        # się tylko URL (używany przez enea_auth.looks_authenticated).
+        final_login_resp = MagicMock(url="https://ebok.enea.pl/dashboard")
+        many_clients_resp = MagicMock(
             text=(
                 "<span>12345</span>"
                 '<a href="/dashboard/select-current-client/'
@@ -139,6 +141,7 @@ class TestEneaDownloader(unittest.TestCase):
         mock_session.get.side_effect = [
             login_page,
             final_login_resp,
+            many_clients_resp,
             client_select_resp,
             summary_page,
         ]
@@ -153,6 +156,59 @@ class TestEneaDownloader(unittest.TestCase):
         mock_input.assert_called_once()
         # Sesja powinna zostać zapisana do pliku, by pominąć logowanie/2FA następnym razem.
         self.assertTrue(downloader._cookie_jar_path.is_file())
+
+    @patch("time.sleep", return_value=None)
+    @patch("eanalizer.downloader.requests.Session")
+    def test_run_download_process_with_reused_session_landing_on_dashboard(
+        self, mock_session_class, mock_sleep
+    ):
+        """
+        Regresja: przy wznowionej sesji (z zapisanych ciasteczek) ebok.enea.pl
+        potrafi przekierować od razu na /dashboard (z zapamiętanym "current
+        client"), pomijając /dashboard/many-clients. _run_download_process
+        musi mimo to poprawnie znaleźć GUID klienta.
+        """
+        mock_session = MagicMock()
+        mock_session.__enter__.return_value = mock_session
+        mock_session.cookies = RequestsCookieJar()
+        mock_session_class.return_value = mock_session
+
+        # Sesja już zalogowana - probe w _ensure_authenticated ląduje wprost na
+        # /dashboard, a nie na /dashboard/many-clients.
+        authenticated_resp = MagicMock(url="https://ebok.enea.pl/dashboard")
+        many_clients_resp = MagicMock(
+            text=(
+                "<span>12345</span>"
+                '<a href="/dashboard/select-current-client/'
+                'aabbccdd-1122-3344-5566-778899aabbcc">wybierz</a>'
+            ),
+        )
+        client_select_resp = MagicMock(text="")
+        summary_page = MagicMock(
+            text=(
+                'data-point-of-delivery-id="POD123" '
+                'data-min-date-value="2024" data-max-date-value="2024"'
+            )
+        )
+        csv_content = "Data;Wartosc\n2024-01-01 00:00:00;1,0\n"
+        csv_post_resp = MagicMock()
+        csv_post_resp.json.return_value = {"data": csv_content}
+
+        mock_session.get.side_effect = [
+            authenticated_resp,
+            many_clients_resp,
+            client_select_resp,
+            summary_page,
+        ]
+        mock_session.post.return_value = csv_post_resp
+
+        downloader = EneaDownloader(self.config, force=True)
+        _capture_stdout(downloader._run_download_process)
+
+        output_file = self.config.data_dir / "12345_dane_dobowo_godzinowe_2024.csv"
+        self.assertTrue(output_file.is_file())
+        self.assertEqual(output_file.read_text(encoding="utf-8"), csv_content)
+        mock_session.post.assert_called_once()
 
     @patch("eanalizer.downloader.requests.Session")
     def test_ensure_authenticated_reuses_saved_session(self, mock_session_class):

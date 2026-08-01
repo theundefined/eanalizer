@@ -157,13 +157,18 @@ def _prompt_for_enea_credentials() -> dict:
         session.headers.update(headers)
         try:
             login_page = session.get(enea_auth.LOGIN_URL)
-            login_response = enea_auth.interactive_login(
-                session, email, password, login_page
-            )
+            enea_auth.interactive_login(session, email, password, login_page)
 
+            # Dedykowana strona wyboru klienta, niezależnie od tego, gdzie akurat
+            # wylądowaliśmy po (re)autoryzacji (patrz analogiczny komentarz w
+            # downloader.py::_run_download_process).
+            many_clients_response = session.get(
+                "https://ebok.enea.pl/dashboard/many-clients"
+            )
+            many_clients_response.raise_for_status()
             customers = re.findall(
                 r'<span>\s*(\d+)\s*</span>.*?href="/dashboard/select-current-client/([a-f0-9\-]+)"',
-                login_response.text,
+                many_clients_response.text,
                 re.DOTALL,
             )
             if not customers:
