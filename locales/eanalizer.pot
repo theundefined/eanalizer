@@ -1,14 +1,14 @@
 # Translations template for PROJECT.
-# Copyright (C) 2025 ORGANIZATION
+# Copyright (C) 2026 ORGANIZATION
 # This file is distributed under the same license as the PROJECT project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-12-19 21:51+0100\n"
+"POT-Creation-Date: 2026-08-02 22:47+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,91 +17,143 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: eanalizer/cli.py:54
+#: eanalizer/cli.py:56
 msgid "Energy data analyzer."
 msgstr ""
 
-#: eanalizer/cli.py:61
+#: eanalizer/cli.py:63
 msgid "List of single data files to analyze."
 msgstr ""
 
-#: eanalizer/cli.py:67
+#: eanalizer/cli.py:69
 msgid "Path to the directory with .csv files."
 msgstr ""
 
-#: eanalizer/cli.py:74
+#: eanalizer/cli.py:76
 msgid "Specifies the energy tariff for a single analysis (default: G11)."
 msgstr ""
 
-#: eanalizer/cli.py:77
+#: eanalizer/cli.py:79
 msgid "Start date of the analysis (format YYYY-MM-DD)."
 msgstr ""
 
-#: eanalizer/cli.py:80
+#: eanalizer/cli.py:82
 msgid "End date of the analysis (format YYYY-MM-DD)."
 msgstr ""
 
-#: eanalizer/cli.py:85
+#: eanalizer/cli.py:88
+msgid ""
+"Predefined analysis period, counted backwards from the last available "
+"date in the data (not today's date). Mutually exclusive with --data-start"
+"/--data-koniec/--ostatnie-dni."
+msgstr ""
+
+#: eanalizer/cli.py:97
+msgid ""
+"Analyzes the last N days of data, counted backwards from the last "
+"available date in the data (not today's date). Mutually exclusive with "
+"--data-start/--data-koniec/--okres."
+msgstr ""
+
+#: eanalizer/cli.py:105
 msgid "Capacity of the physical storage in kWh (e.g., 10.0)."
 msgstr ""
 
-#: eanalizer/cli.py:92
+#: eanalizer/cli.py:112
 #, python-format
 msgid ""
 "Efficiency of the physical storage (round-trip, default: 0.90, i.e., "
 "90%%)."
 msgstr ""
 
-#: eanalizer/cli.py:97
+#: eanalizer/cli.py:117
 msgid "Path to the CSV file with hourly simulation results."
 msgstr ""
 
-#: eanalizer/cli.py:101
+#: eanalizer/cli.py:121
 msgid "Path to the CSV file with aggregated daily data."
 msgstr ""
 
-#: eanalizer/cli.py:106
+#: eanalizer/cli.py:126
 msgid "Calculates the optimal storage capacity."
 msgstr ""
 
-#: eanalizer/cli.py:111
+#: eanalizer/cli.py:131
 msgid "Use real RCE prices instead of fixed tariff prices."
 msgstr ""
 
-#: eanalizer/cli.py:116
+#: eanalizer/cli.py:136
 msgid "Enables calculations for the virtual net-metering storage."
 msgstr ""
 
-#: eanalizer/cli.py:123
+#: eanalizer/cli.py:143
 msgid "Coefficient for energy returned in net-metering (default: 0.8)."
 msgstr ""
 
-#: eanalizer/cli.py:128
+#: eanalizer/cli.py:148
 msgid "Runs a comparison of all available tariffs for the given period."
 msgstr ""
 
-#: eanalizer/cli.py:134
+#: eanalizer/cli.py:154
 msgid "Enables verbose mode for tariff comparison."
 msgstr ""
 
-#: eanalizer/cli.py:151
+#: eanalizer/cli.py:160
+msgid "Nie można jednocześnie użyć --okres i --ostatnie-dni."
+msgstr ""
+
+#: eanalizer/cli.py:166
+msgid ""
+"Flagi --okres/--ostatnie-dni nie mogą być używane razem z --data-start"
+"/--data-koniec."
+msgstr ""
+
+#: eanalizer/cli.py:171
+msgid "--ostatnie-dni musi być liczbą całkowitą dodatnią."
+msgstr ""
+
+#: eanalizer/cli.py:186
 #, python-brace-format
 msgid "No .csv files found for processing in: {}"
 msgstr ""
 
-#: eanalizer/cli.py:154
+#: eanalizer/cli.py:189
 #, python-brace-format
 msgid "Found {} files to process:"
 msgstr ""
 
-#: eanalizer/cli.py:159
+#: eanalizer/cli.py:194
 #, python-brace-format
 msgid ""
 "\n"
 "Total loaded {} records."
 msgstr ""
 
-#: eanalizer/cli.py:166
+#: eanalizer/cli.py:206
+#, python-brace-format
+msgid "Wybrany okres: {} — {} (na podstawie ostatniej dostępnej daty w danych)."
+msgstr ""
+
+#: eanalizer/cli.py:215
 msgid "No data in the given date range for further analysis."
+msgstr ""
+
+#: eanalizer/cli.py:240
+msgid ""
+"Uwaga: tryb --z-cenami-rce nie obsługuje symulacji magazynu ani net-"
+"meteringu; flagi --magazyn-fizyczny/--z-netmetering/--sprawnosc-magazynu "
+"zostaną zignorowane."
+msgstr ""
+
+#: eanalizer/cli.py:252
+msgid ""
+"Uwaga: tryb --z-cenami-rce nie obsługuje eksportu danych ani obliczania "
+"optymalnego magazynu; te opcje zostaną zignorowane."
+msgstr ""
+
+#: eanalizer/cli.py:270
+msgid ""
+"Uwaga: tryb --porownaj-taryfy nie obsługuje eksportu danych ani "
+"obliczania optymalnego magazynu; te opcje zostaną zignorowane."
 msgstr ""
 

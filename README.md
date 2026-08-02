@@ -92,6 +92,11 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 ./eanalizer-cli --taryfa G12w --oblicz-optymalny-magazyn --eksport-dzienny dane_dzienne.csv
 ```
 
+**6. Analiza ostatnich 365 dni danych (bez podawania konkretnych dat)**
+```bash
+./eanalizer-cli --taryfa G12w --okres ostatnie-365-dni
+```
+
 ### Pełna lista opcji
 
 | Flaga                             | Skrót | Opis                                                                                              |
@@ -101,6 +106,8 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 | `--taryfa <nazwa>`                | `-t`  | Określa taryfę do analizy (np. `G11`, `G12w`). Domyślnie `G11`.                                       |
 | `--data-start <RRRR-MM-DD>`       |       | Data początkowa analizy.                                                                           |
 | `--data-koniec <RRRR-MM-DD>`      |       | Data końcowa analizy.                                                                              |
+| `--okres <nazwa>`                 |       | Predefiniowany okres analizy (`ostatnie-30-dni`, `ostatnie-90-dni`, `ostatnie-365-dni`, `biezacy-miesiac`, `poprzedni-miesiac`, `biezacy-rok`, `poprzedni-rok`), liczony wstecz od ostatniej dostępnej daty w danych, a nie od dzisiejszej daty. Wzajemnie wykluczający się z `--data-start`/`--data-koniec`/`--ostatnie-dni`. |
+| `--ostatnie-dni <N>`              |       | Analizuje N ostatnich dni danych, liczonych wstecz od ostatniej dostępnej daty w danych. Wzajemnie wykluczający się z `--data-start`/`--data-koniec`/`--okres`.                                                                        |
 | `--magazyn-fizyczny <kWh>`        |       | Uruchamia symulację z fizycznym magazynem energii o podanej pojemności.                             |
 | `--sprawnosc-magazynu <0.0-1.0>`  |       | Sprawność magazynu fizycznego (domyślnie `0.9`).                                                      |
 | `--z-netmetering`                 |       | Włącza obliczenia dla wirtualnego magazynu (net-metering).                                          |

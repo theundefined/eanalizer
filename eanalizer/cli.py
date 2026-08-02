@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .config import load_config
 from .core import (
+    PREDEFINED_PERIODS,
     aggregate_daily_data,
     analyze_daily_trends,
     calculate_optimal_capacity,
@@ -14,6 +15,7 @@ from .core import (
     filter_data_by_date,
     find_missing_hours,
     print_analysis_summary,
+    resolve_predefined_period,
     run_full_analysis,
     run_rce_analysis,
     run_tariff_comparison,
@@ -80,6 +82,24 @@ def main():
         "--data-koniec", help=_("End date of the analysis (format YYYY-MM-DD).")
     )
     parser.add_argument(
+        "--okres",
+        choices=PREDEFINED_PERIODS,
+        help=_(
+            "Predefined analysis period, counted backwards from the last "
+            "available date in the data (not today's date). Mutually "
+            "exclusive with --data-start/--data-koniec/--ostatnie-dni."
+        ),
+    )
+    parser.add_argument(
+        "--ostatnie-dni",
+        type=int,
+        help=_(
+            "Analyzes the last N days of data, counted backwards from the "
+            "last available date in the data (not today's date). Mutually "
+            "exclusive with --data-start/--data-koniec/--okres."
+        ),
+    )
+    parser.add_argument(
         "--magazyn-fizyczny",
         type=float,
         help=_("Capacity of the physical storage in kWh (e.g., 10.0)."),
@@ -135,6 +155,21 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.okres and args.ostatnie_dni:
+        parser.error(_("Nie można jednocześnie użyć --okres i --ostatnie-dni."))
+    if (args.okres or args.ostatnie_dni is not None) and (
+        args.data_start or args.data_koniec
+    ):
+        parser.error(
+            _(
+                "Flagi --okres/--ostatnie-dni nie mogą być używane razem z "
+                "--data-start/--data-koniec."
+            )
+        )
+    if args.ostatnie_dni is not None and args.ostatnie_dni <= 0:
+        parser.error(_("--ostatnie-dni musi być liczbą całkowitą dodatnią."))
+
     app_cfg = load_config()
 
     # Data loading
@@ -157,6 +192,20 @@ def main():
         all_energy_data.extend(load_from_enea_csv(file_path))
     all_energy_data.sort(key=lambda x: x.timestamp)
     print(_("\nTotal loaded {} records.").format(len(all_energy_data)))
+
+    if args.okres or args.ostatnie_dni is not None:
+        try:
+            args.data_start, args.data_koniec = resolve_predefined_period(
+                all_energy_data, okres=args.okres, ostatnie_dni=args.ostatnie_dni
+            )
+        except ValueError as e:
+            print(str(e))
+            return
+        print(
+            _(
+                "Wybrany okres: {} — {} (na podstawie ostatniej dostępnej daty w danych)."
+            ).format(args.data_start, args.data_koniec)
+        )
 
     # Data filtering
     filtered_data = filter_data_by_date(

@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Tuple, Any
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from .models import EnergyData, SimulationResult
 from .tariffs import TariffManager
 import pandas as pd
@@ -305,6 +305,73 @@ def run_rce_analysis(data: List[EnergyData], hourly_prices: Dict[datetime, float
     print(f"SUMARYCZNY PRZYCHÓD z energii oddanej: {total_income:.2f} zł")
     print(f"BILANS FINANSOWY (przychód - koszt): {total_income - total_cost:.2f} zł")
     print("----------------------------------------")
+
+
+PREDEFINED_PERIODS = [
+    "ostatnie-30-dni",
+    "ostatnie-90-dni",
+    "ostatnie-365-dni",
+    "biezacy-miesiac",
+    "poprzedni-miesiac",
+    "biezacy-rok",
+    "poprzedni-rok",
+]
+
+
+def resolve_predefined_period(
+    data: List[EnergyData],
+    okres: Optional[str] = None,
+    ostatnie_dni: Optional[int] = None,
+) -> Tuple[str, str]:
+    """
+    Wyznacza (data_start, data_koniec) w formacie RRRR-MM-DD dla predefiniowanego
+    okresu. Punktem odniesienia jest data ostatniego dostępnego rekordu w danych
+    (a nie dzisiejsza data), więc np. "ostatnie 365 dni" liczone są wstecz od
+    momentu, do którego faktycznie sięgają dane.
+
+    Jeśli wyliczony początek okresu wypada wcześniej niż najstarszy dostępny
+    rekord w danych, zostaje przycięty do tej najstarszej daty — inaczej np.
+    "ostatnie 365 dni" przy krótszej historii danych zgłaszałoby tysiące
+    pozornie "brakujących" godzin sprzed zakresu, jaki użytkownik w ogóle ma.
+    """
+    if not data:
+        raise ValueError("Brak danych do wyznaczenia okresu.")
+    end_ref = max(d.timestamp for d in data).date()
+    earliest = min(d.timestamp for d in data).date()
+
+    def _clamp(start: date) -> str:
+        return max(start, earliest).isoformat()
+
+    if ostatnie_dni is not None:
+        start = end_ref - timedelta(days=ostatnie_dni - 1)
+        return _clamp(start), end_ref.isoformat()
+
+    if okres == "ostatnie-30-dni":
+        start = end_ref - timedelta(days=29)
+        return _clamp(start), end_ref.isoformat()
+    if okres == "ostatnie-90-dni":
+        start = end_ref - timedelta(days=89)
+        return _clamp(start), end_ref.isoformat()
+    if okres == "ostatnie-365-dni":
+        start = end_ref - timedelta(days=364)
+        return _clamp(start), end_ref.isoformat()
+    if okres == "biezacy-miesiac":
+        start = end_ref.replace(day=1)
+        return _clamp(start), end_ref.isoformat()
+    if okres == "poprzedni-miesiac":
+        first_of_current = end_ref.replace(day=1)
+        last_of_previous = first_of_current - timedelta(days=1)
+        first_of_previous = last_of_previous.replace(day=1)
+        return _clamp(first_of_previous), last_of_previous.isoformat()
+    if okres == "biezacy-rok":
+        start = end_ref.replace(month=1, day=1)
+        return _clamp(start), end_ref.isoformat()
+    if okres == "poprzedni-rok":
+        start = date(end_ref.year - 1, 1, 1)
+        end = date(end_ref.year - 1, 12, 31)
+        return _clamp(start), end.isoformat()
+
+    raise ValueError(f"Nieznany okres: {okres}")
 
 
 def filter_data_by_date(

@@ -115,6 +115,76 @@ class TestCli(unittest.TestCase):
         self.assertNotIn("nie obsługuje eksportu", output)
         self.assertIn("Porównanie taryf", output)
 
+    def test_okres_conflicts_with_data_start(self):
+        with self.assertRaises(SystemExit):
+            _run_cli(
+                [
+                    "--katalog",
+                    str(self.data_dir),
+                    "--okres",
+                    "ostatnie-30-dni",
+                    "--data-start",
+                    "2024-05-01",
+                ],
+                self.app_config,
+            )
+
+    def test_okres_conflicts_with_ostatnie_dni(self):
+        with self.assertRaises(SystemExit):
+            _run_cli(
+                [
+                    "--katalog",
+                    str(self.data_dir),
+                    "--okres",
+                    "ostatnie-30-dni",
+                    "--ostatnie-dni",
+                    "10",
+                ],
+                self.app_config,
+            )
+
+    def test_ostatnie_dni_musi_byc_dodatnie(self):
+        with self.assertRaises(SystemExit):
+            _run_cli(
+                ["--katalog", str(self.data_dir), "--ostatnie-dni", "0"],
+                self.app_config,
+            )
+
+    def test_ostatnie_dni_resolves_range_from_last_data_date(self):
+        """
+        test_data.csv zawiera dane od 2024-05-01 do 2024-05-04. --ostatnie-dni 2
+        powinno wyznaczyć zakres liczony wstecz od 2024-05-04 (ostatniej daty w
+        danych), a nie od dzisiejszej daty, i przekazać go dalej do filtrowania.
+        """
+        output = _run_cli(
+            ["--katalog", str(self.data_dir), "--ostatnie-dni", "2"],
+            self.app_config,
+        )
+        self.assertIn(
+            "Wybrany okres: 2024-05-03 — 2024-05-04",
+            output,
+        )
+        self.assertIn(
+            "Filtrowanie danych w zakresie od 2024-05-03 do 2024-05-04",
+            output,
+        )
+
+    def test_okres_clamps_start_to_earliest_available_data(self):
+        """
+        test_data.csv ma dane tylko od 2024-05-01. --okres ostatnie-30-dni
+        wyliczyłby start 2024-04-05, ale powinien zostać przycięty do
+        najwcześniejszej dostępnej daty (2024-05-01), by nie zgłaszać tysięcy
+        pozornie brakujących godzin sprzed zakresu danych.
+        """
+        output = _run_cli(
+            ["--katalog", str(self.data_dir), "--okres", "ostatnie-30-dni"],
+            self.app_config,
+        )
+        self.assertIn(
+            "Wybrany okres: 2024-05-01 — 2024-05-04",
+            output,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ from eanalizer.core import (
     print_analysis_summary,
     calculate_optimal_capacity,
     find_missing_hours,
+    resolve_predefined_period,
 )
 from eanalizer.tariffs import TariffManager
 from eanalizer.models import EnergyData
@@ -321,6 +322,101 @@ class TestCoreFunctionality(unittest.TestCase):
         output = captured_output.getvalue()
         self.assertIn("Brak danych dla godziny: 2023-06-15 10:00", output)
         self.assertNotIn("prawdopodobnie zmiana czasu", output)
+
+    def _make_data_ending_on(self, end_date, start_date=datetime(2000, 1, 1).date()):
+        """
+        Pomocnicza lista danych rozpoczynająca się bardzo wcześnie (domyślnie
+        2000-01-01, by nie ograniczać wyliczonych okresów) i kończąca się na
+        podanej dacie.
+        """
+        return [
+            EnergyData(
+                timestamp=datetime(
+                    start_date.year, start_date.month, start_date.day, 12
+                ),
+                pobor_przed=0,
+                oddanie_przed=0,
+                pobor=0,
+                oddanie=0,
+            ),
+            EnergyData(
+                timestamp=datetime(end_date.year, end_date.month, end_date.day, 12),
+                pobor_przed=0,
+                oddanie_przed=0,
+                pobor=0,
+                oddanie=0,
+            ),
+        ]
+
+    def test_resolve_predefined_period_last_365_days(self):
+        """
+        'ostatnie 365 dni' powinno być liczone wstecz od ostatniej dostępnej daty
+        w danych, a nie od dzisiejszej daty.
+        """
+        data = self._make_data_ending_on(datetime(2026, 7, 31).date())
+        start, end = resolve_predefined_period(data, okres="ostatnie-365-dni")
+        self.assertEqual(start, "2025-08-01")
+        self.assertEqual(end, "2026-07-31")
+
+    def test_resolve_predefined_period_last_30_days(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 31).date())
+        start, end = resolve_predefined_period(data, okres="ostatnie-30-dni")
+        self.assertEqual(start, "2026-07-02")
+        self.assertEqual(end, "2026-07-31")
+
+    def test_resolve_predefined_period_ostatnie_dni_custom(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 31).date())
+        start, end = resolve_predefined_period(data, ostatnie_dni=10)
+        self.assertEqual(start, "2026-07-22")
+        self.assertEqual(end, "2026-07-31")
+
+    def test_resolve_predefined_period_biezacy_miesiac(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 15).date())
+        start, end = resolve_predefined_period(data, okres="biezacy-miesiac")
+        self.assertEqual(start, "2026-07-01")
+        self.assertEqual(end, "2026-07-15")
+
+    def test_resolve_predefined_period_poprzedni_miesiac(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 15).date())
+        start, end = resolve_predefined_period(data, okres="poprzedni-miesiac")
+        self.assertEqual(start, "2026-06-01")
+        self.assertEqual(end, "2026-06-30")
+
+    def test_resolve_predefined_period_poprzedni_miesiac_na_poczatku_roku(self):
+        """Przejście przez granicę roku: poprzedni miesiąc dla stycznia to grudzień."""
+        data = self._make_data_ending_on(datetime(2026, 1, 10).date())
+        start, end = resolve_predefined_period(data, okres="poprzedni-miesiac")
+        self.assertEqual(start, "2025-12-01")
+        self.assertEqual(end, "2025-12-31")
+
+    def test_resolve_predefined_period_biezacy_rok(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 15).date())
+        start, end = resolve_predefined_period(data, okres="biezacy-rok")
+        self.assertEqual(start, "2026-01-01")
+        self.assertEqual(end, "2026-07-15")
+
+    def test_resolve_predefined_period_poprzedni_rok(self):
+        data = self._make_data_ending_on(datetime(2026, 7, 15).date())
+        start, end = resolve_predefined_period(data, okres="poprzedni-rok")
+        self.assertEqual(start, "2025-01-01")
+        self.assertEqual(end, "2025-12-31")
+
+    def test_resolve_predefined_period_empty_data_raises(self):
+        with self.assertRaises(ValueError):
+            resolve_predefined_period([], okres="ostatnie-30-dni")
+
+    def test_resolve_predefined_period_clamps_to_earliest_data(self):
+        """
+        Gdy żądany okres (np. ostatnie 365 dni) wykracza poza dostępną historię
+        danych, początek okresu powinien zostać przycięty do najstarszego
+        dostępnego rekordu, zamiast zgłaszać tysiące pozornie brakujących godzin.
+        """
+        data = self._make_data_ending_on(
+            datetime(2026, 7, 31).date(), start_date=datetime(2026, 6, 1).date()
+        )
+        start, end = resolve_predefined_period(data, okres="ostatnie-365-dni")
+        self.assertEqual(start, "2026-06-01")
+        self.assertEqual(end, "2026-07-31")
 
     def test_tariff_comparison_shows_cost_breakdown(self):
         """
