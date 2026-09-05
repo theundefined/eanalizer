@@ -18,6 +18,8 @@ from eanalizer.core import (
     calculate_optimal_capacity,
     find_missing_hours,
     resolve_predefined_period,
+    aggregate_monthly_data,
+    print_monthly_summary,
 )
 from eanalizer.tariffs import TariffManager
 from eanalizer.models import EnergyData
@@ -455,3 +457,57 @@ class TestCoreFunctionality(unittest.TestCase):
             f"(energia: {expected_energy:>9.2f} zł, opłaty stałe: {expected_fixed:>8.2f} zł)",
             output,
         )
+
+    def test_aggregate_monthly_data_sums_per_month(self):
+        data = [
+            EnergyData(
+                timestamp=datetime(2024, 5, 1, 4),
+                pobor_przed=1.0,
+                oddanie_przed=0.0,
+                pobor=1.0,
+                oddanie=0.0,
+            ),
+            EnergyData(
+                timestamp=datetime(2024, 5, 15, 10),
+                pobor_przed=2.0,
+                oddanie_przed=1.0,
+                pobor=1.5,
+                oddanie=0.5,
+            ),
+            EnergyData(
+                timestamp=datetime(2024, 6, 1, 4),
+                pobor_przed=3.0,
+                oddanie_przed=0.0,
+                pobor=3.0,
+                oddanie=0.0,
+            ),
+        ]
+
+        monthly_df = aggregate_monthly_data(data)
+
+        self.assertEqual(list(monthly_df["miesiac"]), ["2024-05", "2024-06"])
+        may_row = monthly_df[monthly_df["miesiac"] == "2024-05"].iloc[0]
+        self.assertAlmostEqual(may_row["pobor_przed"], 3.0)
+        self.assertAlmostEqual(may_row["oddanie_przed"], 1.0)
+        self.assertAlmostEqual(may_row["pobor"], 2.5)
+        self.assertAlmostEqual(may_row["oddanie"], 0.5)
+        june_row = monthly_df[monthly_df["miesiac"] == "2024-06"].iloc[0]
+        self.assertAlmostEqual(june_row["pobor_przed"], 3.0)
+
+    def test_aggregate_monthly_data_empty_input(self):
+        self.assertTrue(aggregate_monthly_data([]).empty)
+
+    def test_print_monthly_summary_shows_totals(self):
+        monthly_df = aggregate_monthly_data(self.test_data)
+
+        import sys
+        from io import StringIO
+
+        original_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        print_monthly_summary(monthly_df)
+        sys.stdout = original_stdout
+        output = captured_output.getvalue()
+
+        self.assertIn("2024-05", output)
+        self.assertIn("RAZEM", output)

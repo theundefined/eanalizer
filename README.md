@@ -97,6 +97,11 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 ./eanalizer-cli --taryfa G12w --okres ostatnie-365-dni
 ```
 
+**7. Zbiorcze zestawienie miesięczne (pobrane/wysłane, przed i po bilansowaniu)**
+```bash
+./eanalizer-cli --taryfa G12w --okres biezacy-rok --miesieczne --eksport-miesieczny dane_miesieczne.csv
+```
+
 ### Pełna lista opcji
 
 | Flaga                             | Skrót | Opis                                                                                              |
@@ -117,6 +122,8 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 | `--oblicz-optymalny-magazyn`      |       | Oblicza i wyświetla optymalną pojemność magazynu dla dwóch scenariuszy.                             |
 | `--eksport-symulacji <plik.csv>`  |       | Eksportuje godzinowe wyniki symulacji magazynu do pliku CSV.                                         |
 | `--eksport-dzienny <plik.csv>`    |       | Eksportuje zagregowane dane dzienne do pliku CSV.                                                     |
+| `--miesieczne`                    |       | Wyświetla tabelę z zagregowanymi danymi miesięcznymi (pobrane/wysłane, przed i po bilansowaniu).      |
+| `--eksport-miesieczny <plik.csv>` |       | Eksportuje zagregowane dane miesięczne do pliku CSV.                                                   |
 | `--verbose`                       | `-v`  | Włącza tryb szczegółowy, np. dla porównania taryf.                                                  |
 
 > **Uwaga:** `--z-cenami-rce` nie obsługuje symulacji magazynu ani net-meteringu (`--magazyn-fizyczny`, `--z-netmetering`, `--sprawnosc-magazynu`) ani eksportu/obliczania optymalnego magazynu. `--porownaj-taryfy` nie obsługuje eksportu ani obliczania optymalnego magazynu. Te flagi, jeśli podane w niewspieranym trybie, zostaną zignorowane, o czym program wypisze stosowne ostrzeżenie.

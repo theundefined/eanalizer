@@ -9,12 +9,14 @@ from .config import load_config
 from .core import (
     PREDEFINED_PERIODS,
     aggregate_daily_data,
+    aggregate_monthly_data,
     analyze_daily_trends,
     calculate_optimal_capacity,
     export_to_csv,
     filter_data_by_date,
     find_missing_hours,
     print_analysis_summary,
+    print_monthly_summary,
     resolve_predefined_period,
     run_full_analysis,
     run_rce_analysis,
@@ -119,6 +121,15 @@ def main():
     parser.add_argument(
         "--eksport-dzienny",
         help=_("Path to the CSV file with aggregated daily data."),
+    )
+    parser.add_argument(
+        "--miesieczne",
+        action="store_true",
+        help=_("Displays a table with aggregated monthly data."),
+    )
+    parser.add_argument(
+        "--eksport-miesieczny",
+        help=_("Path to the CSV file with aggregated monthly data."),
     )
     parser.add_argument(
         "--oblicz-optymalny-magazyn",
@@ -246,6 +257,8 @@ def main():
             args.oblicz_optymalny_magazyn
             or args.eksport_dzienny
             or args.eksport_symulacji
+            or args.miesieczne
+            or args.eksport_miesieczny
         ):
             print(
                 _(
@@ -264,6 +277,8 @@ def main():
             args.oblicz_optymalny_magazyn
             or args.eksport_dzienny
             or args.eksport_symulacji
+            or args.miesieczne
+            or args.eksport_miesieczny
         ):
             print(
                 _(
@@ -302,6 +317,13 @@ def main():
 
         if args.eksport_dzienny:
             export_to_csv(daily_data_df, args.eksport_dzienny)
+
+        if args.miesieczne or args.eksport_miesieczny:
+            monthly_data_df = aggregate_monthly_data(filtered_data)
+            if args.miesieczne:
+                print_monthly_summary(monthly_data_df)
+            if args.eksport_miesieczny:
+                export_to_csv(monthly_data_df, args.eksport_miesieczny)
 
         if args.eksport_symulacji and simulation_df is not None:
             export_to_csv(simulation_df, args.eksport_symulacji)

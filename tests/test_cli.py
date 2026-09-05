@@ -115,6 +115,42 @@ class TestCli(unittest.TestCase):
         self.assertNotIn("nie obsługuje eksportu", output)
         self.assertIn("Porównanie taryf", output)
 
+    def test_miesieczne_prints_monthly_table(self):
+        output = _run_cli(
+            ["--katalog", str(self.data_dir), "--miesieczne"], self.app_config
+        )
+        self.assertIn("Podsumowanie miesięczne", output)
+        self.assertIn("2024-05", output)
+
+    def test_eksport_miesieczny_writes_csv_file(self):
+        out_path = self.tmp_dir / "miesieczne.csv"
+        _run_cli(
+            [
+                "--katalog",
+                str(self.data_dir),
+                "--eksport-miesieczny",
+                str(out_path),
+            ],
+            self.app_config,
+        )
+        self.assertTrue(out_path.exists())
+        self.assertIn("2024-05", out_path.read_text(encoding="utf-8"))
+
+    def test_tariff_comparison_warns_about_ignored_monthly_flags(self):
+        output = _run_cli(
+            [
+                "--katalog",
+                str(self.data_dir),
+                "--porownaj-taryfy",
+                "--miesieczne",
+            ],
+            self.app_config,
+        )
+        self.assertIn(
+            "tryb --porownaj-taryfy nie obsługuje eksportu danych",
+            output,
+        )
+
     def test_okres_conflicts_with_data_start(self):
         with self.assertRaises(SystemExit):
             _run_cli(

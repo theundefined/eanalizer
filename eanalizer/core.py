@@ -427,6 +427,69 @@ def aggregate_daily_data(data: List[EnergyData]) -> pd.DataFrame:
     return daily_df
 
 
+def aggregate_monthly_data(data: List[EnergyData]) -> pd.DataFrame:
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    df["miesiac"] = df["timestamp"].dt.strftime("%Y-%m")
+    monthly_df = (
+        df.groupby("miesiac")
+        .agg(
+            pobor_przed=("pobor_przed", "sum"),
+            oddanie_przed=("oddanie_przed", "sum"),
+            pobor=("pobor", "sum"),
+            oddanie=("oddanie", "sum"),
+        )
+        .reset_index()
+        .sort_values("miesiac")
+    )
+    return monthly_df
+
+
+def print_monthly_summary(monthly_df: pd.DataFrame):
+    """Prints a table with monthly aggregated energy volumes."""
+    if monthly_df.empty:
+        return
+
+    def _fmt(value: float) -> str:
+        return f"{value:.3f} kWh"
+
+    def _row(label: str, pobor_przed, oddanie_przed, pobor, oddanie) -> str:
+        return (
+            f"{label:<9} | {_fmt(pobor_przed):>12} | {_fmt(oddanie_przed):>12} | "
+            f"{_fmt(pobor):>18} | {_fmt(oddanie):>18}"
+        )
+
+    print("\n--- Podsumowanie miesięczne ---")
+    header = (
+        f"{'Miesiąc':<9} | {'Pobrane':>12} | {'Wysłane':>12} | "
+        f"{'Pobrane (bilans.)':>18} | {'Wysłane (bilans.)':>18}"
+    )
+    print(header)
+    print("-" * len(header))
+    for row in monthly_df.itertuples():
+        print(
+            _row(
+                row.miesiac,
+                row.pobor_przed,
+                row.oddanie_przed,
+                row.pobor,
+                row.oddanie,
+            )
+        )
+    print("-" * len(header))
+    print(
+        _row(
+            "RAZEM",
+            monthly_df["pobor_przed"].sum(),
+            monthly_df["oddanie_przed"].sum(),
+            monthly_df["pobor"].sum(),
+            monthly_df["oddanie"].sum(),
+        )
+    )
+    print("-" * len(header))
+
+
 def export_to_csv(df: pd.DataFrame, file_path: str):
     if df.empty:
         print("Brak danych do wyeksportowania.")
