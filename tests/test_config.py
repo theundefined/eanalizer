@@ -186,10 +186,10 @@ class TestPromptForEneaCredentials(unittest.TestCase):
         mock_session.__enter__.return_value = mock_session
         mock_session_class.return_value = mock_session
 
-        # Nowy flow logowania Enea (OIDC/eumowy.enea.pl + kod 2FA) - patrz enea_auth.py.
+        # Flow logowania Enea (OIDC/moja.enea.pl + kod 2FA) - patrz enea_auth.py.
         login_page = MagicMock(
             url=(
-                "https://eumowy.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
                 "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
                 "scope=openid+profile+phone&state=abc123"
             )

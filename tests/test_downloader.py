@@ -110,7 +110,7 @@ class TestEneaDownloader(unittest.TestCase):
 
         login_page = MagicMock(
             url=(
-                "https://eumowy.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
                 "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
                 "scope=openid+profile+phone&state=abc123"
             )
@@ -236,13 +236,15 @@ class TestEneaDownloader(unittest.TestCase):
 
         login_page = MagicMock(
             url=(
-                "https://eumowy.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
                 "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
                 "scope=openid+profile+phone&state=abc123"
             )
         )
         login_api_resp = MagicMock(status_code=200)
+        login_api_resp.json.return_value = {"ok": True}
         code_check_resp = MagicMock(status_code=200)
+        code_check_resp.json.return_value = {"ok": True}
         final_login_resp = MagicMock(url="https://ebok.enea.pl/dashboard/many-clients")
 
         mock_session.get.side_effect = [login_page, final_login_resp]

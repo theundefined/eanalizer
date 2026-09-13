@@ -150,7 +150,7 @@ class EneaDownloader:
                 "- wymagane pełne logowanie."
             )
         response = enea_auth.interactive_login(
-            session, self.config.email, self.config.password, response
+            session, self.config.email, self.config.password, response, debug=self.debug
         )
         self._save_session_cookies(session)
         return response
