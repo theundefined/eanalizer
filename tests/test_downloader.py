@@ -228,6 +228,48 @@ class TestEneaDownloader(unittest.TestCase):
         self.assertIn("Wykorzystano zapisaną sesję", output)
         mock_session.post.assert_not_called()
 
+    def _write_cookies_file(self, lines):
+        path = self.tmp_dir / "cookies.txt"
+        path.write_text("# Netscape HTTP Cookie File\n" + "".join(lines), encoding="utf-8")
+        return path
+
+    def test_ensure_authenticated_with_imported_cookies_saves_session(self):
+        cookies_file = self._write_cookies_file(
+            [
+                "#HttpOnly_sso.moja.enea.pl\tFALSE\t/\tTRUE\t0\tKEYCLOAK_IDENTITY\tabc\n",
+                "#HttpOnly_ebok.enea.pl\tFALSE\t/\tTRUE\t0\tEBOK_SESSION\tdef\n",
+            ]
+        )
+        mock_session = MagicMock()
+        mock_session.cookies = RequestsCookieJar()
+        mock_session.get.return_value = MagicMock(url="https://ebok.enea.pl/dashboard")
+
+        downloader = EneaDownloader(self.config, cookies_file=cookies_file)
+        output = _capture_stdout(downloader._ensure_authenticated, mock_session)
+
+        self.assertIn("EBOK_SESSION (ebok.enea.pl)", output)
+        self.assertNotIn("abc", output)  # wartości ciasteczek nie są wypisywane
+        self.assertNotIn("brak ciasteczek SSO", output)
+        mock_session.post.assert_not_called()
+        saved = (self.config.cache_dir / "enea_session_cookies.txt").read_text()
+        self.assertIn("KEYCLOAK_IDENTITY", saved)
+
+    def test_imported_cookies_without_valid_session_raise(self):
+        cookies_file = self._write_cookies_file(
+            ["ebok.enea.pl\tFALSE\t/\tTRUE\t0\tEBOK_SESSION\tstale\n"]
+        )
+        mock_session = MagicMock()
+        mock_session.cookies = RequestsCookieJar()
+        mock_session.get.return_value = MagicMock(
+            url="https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok"
+        )
+
+        downloader = EneaDownloader(self.config, cookies_file=cookies_file)
+        with self.assertRaises(ConnectionError):
+            _capture_stdout(downloader._ensure_authenticated, mock_session)
+        mock_session.post.assert_not_called()
+        self.assertFalse((self.config.cache_dir / "enea_session_cookies.txt").exists())
+
     @patch("builtins.input", return_value="654321")
     @patch("eanalizer.downloader.requests.Session")
     def test_debug_mode_writes_cookie_dump(self, mock_session_class, mock_input):

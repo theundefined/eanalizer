@@ -37,6 +37,11 @@ eanalizer = "eanalizer.cli:main"
 enea-downloader = "eanalizer.downloader_cli:main"
 
 [project.optional-dependencies]
+# Wbudowane okno logowania do Enea (reCAPTCHA) - patrz eanalizer/enea_browser_login.py
+browser = [
+    "PyQt6>=6.5",
+    "PyQt6-WebEngine>=6.5",
+]
 dev = [
     "Babel",
     "ruff",

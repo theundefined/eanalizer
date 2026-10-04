@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import requests
 
 from . import enea_auth
-from .config import AppConfig
+from .config import SESSION_COOKIES_FILE_NAME, AppConfig
 
 
 class EneaDownloader:
@@ -18,12 +18,14 @@ class EneaDownloader:
         force: bool = False,
         report_only: bool = False,
         debug: bool = False,
+        cookies_file=None,
     ):
         """Initializes the downloader with a complete application configuration."""
         self.config = config
         self.force = force
         self.report_only = report_only
         self.debug = debug
+        self.cookies_file = cookies_file
 
     def download_data(self):
         """
@@ -73,7 +75,11 @@ class EneaDownloader:
 
     @property
     def _cookie_jar_path(self):
-        return self.config.cache_dir / "enea_session_cookies.txt"
+        return self.config.cache_dir / SESSION_COOKIES_FILE_NAME
+
+    @property
+    def _browser_profile_dir(self):
+        return self.config.cache_dir / "enea_browser_profile"
 
     def _load_session_cookies(self, session):
         """Wczytuje zapisaną sesję (jeśli istnieje) do bieżącego requests.Session."""
@@ -92,10 +98,7 @@ class EneaDownloader:
 
     def _save_session_cookies(self, session):
         """Zapisuje bieżące ciasteczka sesji, by pominąć logowanie/2FA przy kolejnym uruchomieniu."""
-        jar = http.cookiejar.LWPCookieJar(str(self._cookie_jar_path))
-        for cookie in session.cookies:
-            jar.set_cookie(cookie)
-        jar.save(ignore_discard=True, ignore_expires=True)
+        jar = enea_auth.save_session_cookies(session, self._cookie_jar_path)
         if self.debug:
             print(
                 f"[debug] Zapisano sesję ({len(jar)} ciasteczek) do {self._cookie_jar_path}"
@@ -136,9 +139,16 @@ class EneaDownloader:
         Zapewnia zalogowaną sesję: najpierw próbuje odtworzyć zapisaną wcześniej
         sesję (bez logowania/2FA), a dopiero gdy to się nie uda - przechodzi
         przez pełny interaktywny login + weryfikację dwuskładnikową
-        (eanalizer.enea_auth.interactive_login).
+        (eanalizer.enea_auth.login - przy reCAPTCHA w oknie przeglądarki).
+
+        Przy `cookies_file` (--import-cookies) sesja jest brana z ciasteczek
+        wyeksportowanych z przeglądarki, w której użytkownik zalogował się sam
+        (wymagane, odkąd Enea ma reCAPTCHA na formularzu logowania).
         """
         self._load_session_cookies(session)
+        if self.cookies_file:
+            return self._authenticate_with_imported_cookies(session)
+
         response = session.get(enea_auth.LOGIN_URL)
         if enea_auth.looks_authenticated(response):
             print("Wykorzystano zapisaną sesję logowania - pominięto logowanie i 2FA.")
@@ -149,9 +159,37 @@ class EneaDownloader:
                 f"[debug] Zapisana sesja nieaktualna lub jej brak (trafiono na {response.url}) "
                 "- wymagane pełne logowanie."
             )
-        response = enea_auth.interactive_login(
-            session, self.config.email, self.config.password, response, debug=self.debug
+        response = enea_auth.login(
+            session,
+            self.config.email,
+            self.config.password,
+            response,
+            browser_profile_dir=self._browser_profile_dir,
+            debug=self.debug,
         )
+        self._save_session_cookies(session)
+        return response
+
+    def _authenticate_with_imported_cookies(self, session):
+        imported = enea_auth.import_cookies_file(session, self.cookies_file)
+        print(f"Zaimportowano {len(imported)} ciasteczek *.enea.pl z {self.cookies_file}:")
+        for cookie in imported:
+            print(f"  - {cookie.name} ({cookie.domain})")
+        if not any(cookie.domain.lstrip(".").startswith("sso.") for cookie in imported):
+            print(
+                "Uwaga: brak ciasteczek SSO (np. z sso.moja.enea.pl) - sesja może "
+                "wygasnąć szybko. Wyeksportuj wszystkie ciasteczka, nie tylko z "
+                "bieżącej karty."
+            )
+
+        response = session.get(enea_auth.LOGIN_URL)
+        if not enea_auth.looks_authenticated(response):
+            raise ConnectionError(
+                "Zaimportowane ciasteczka nie dają zalogowanej sesji (trafiono na "
+                f"{response.url}). Zaloguj się ponownie na ebok.enea.pl w "
+                "przeglądarce i wyeksportuj świeże ciasteczka."
+            )
+        print("Zalogowano przy użyciu sesji zaimportowanej z przeglądarki.")
         self._save_session_cookies(session)
         return response
 

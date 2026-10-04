@@ -1,5 +1,7 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from requests.cookies import RequestsCookieJar
@@ -51,6 +53,8 @@ class TestInteractiveLogin(unittest.TestCase):
         login_payload = json.loads(login_call.kwargs["data"])
         self.assertEqual(login_payload["login"], "user@example.com")
         self.assertEqual(login_payload["password"], "secret")
+        # Przy wyłączonej CAPTCHA oficjalny frontend wysyła literalnie "null".
+        self.assertEqual(login_payload["recaptcha_token"], "null")
 
     def test_rejects_unexpected_login_host(self):
         login_page = MagicMock(
@@ -103,6 +107,83 @@ class TestInteractiveLogin(unittest.TestCase):
 
         self.assertIs(result, login_page)
         session.post.assert_not_called()
+
+    def test_recaptcha_enabled_on_login_page_raises_without_posting(self):
+        """Regresja (październik 2026): Enea włączyła reCAPTCHA Enterprise na
+        formularzu logowania - zamiast wysyłać skazany na porażkę POST (i mylący
+        komunikat "Sprawdź email/hasło"), od razu kierujemy do importu sesji."""
+        login_page = MagicMock(
+            url=(
+                "https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
+                "scope=openid+profile+phone&state=abc123"
+            ),
+            text='<div id="login" data-is-logged="" data-recaptchaEnabled="1"></div>',
+        )
+        session = MagicMock()
+
+        with self.assertRaises(enea_auth.RecaptchaRequiredError) as ctx:
+            enea_auth.interactive_login(
+                session, "user@example.com", "secret", login_page
+            )
+        self.assertIn("--import-cookies", str(ctx.exception))
+        session.post.assert_not_called()
+
+    def test_recaptcha_validation_error_from_api_raises_recaptcha_error(self):
+        login_page = MagicMock(
+            url=(
+                "https://moja.enea.pl/pl/Logowanie?client_id=asseco_ebok&"
+                "redirect_uri=https%3A%2F%2Febok.enea.pl%2Fsignin-oidc&"
+                "scope=openid+profile+phone&state=abc123"
+            ),
+            text='<div data-recaptchaEnabled="0"></div>',
+        )
+        login_api_resp = MagicMock(
+            status_code=400,
+            text='{"message":"validation_failed","errors":[{"property":"recaptcha_token"}]}',
+        )
+        session = MagicMock()
+        session.post.return_value = login_api_resp
+
+        with self.assertRaises(enea_auth.RecaptchaRequiredError):
+            enea_auth.interactive_login(
+                session, "user@example.com", "secret", login_page
+            )
+
+
+class TestImportCookiesFile(unittest.TestCase):
+    def test_imports_only_enea_cookies_including_httponly_session_cookies(self):
+        content = (
+            "# Netscape HTTP Cookie File\n"
+            "#HttpOnly_sso.moja.enea.pl\tFALSE\t/realms/enea/\tTRUE\t0\tKEYCLOAK_IDENTITY\tabc\n"
+            "#HttpOnly_ebok.enea.pl\tFALSE\t/\tTRUE\t0\tEBOK_SESSION\tdef\n"
+            ".enea.pl\tTRUE\t/\tFALSE\t0\tshared\tx\n"
+            ".google.com\tTRUE\t/\tTRUE\t0\tSID\tobcy\n"
+            ".notenea.pl\tTRUE\t/\tTRUE\t0\tfake\tobcy\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cookies.txt"
+            path.write_text(content, encoding="utf-8")
+            session = MagicMock()
+            session.cookies = RequestsCookieJar()
+
+            imported = enea_auth.import_cookies_file(session, path)
+
+        self.assertEqual(
+            sorted(c.name for c in imported),
+            ["EBOK_SESSION", "KEYCLOAK_IDENTITY", "shared"],
+        )
+        self.assertEqual(
+            sorted(c.name for c in session.cookies),
+            ["EBOK_SESSION", "KEYCLOAK_IDENTITY", "shared"],
+        )
+
+    def test_invalid_file_raises_value_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cookies.txt"
+            path.write_text("to nie jest plik cookies.txt\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                enea_auth.import_cookies_file(MagicMock(), path)
 
 
 if __name__ == "__main__":

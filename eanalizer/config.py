@@ -13,6 +13,7 @@ from . import enea_auth
 
 APP_NAME = "eanalizer"
 CONFIG_FILE_NAME = "config.ini"
+SESSION_COOKIES_FILE_NAME = "enea_session_cookies.txt"
 DEFAULT_TARIFFS_FILE = "tariffs.csv"
 
 
@@ -144,8 +145,16 @@ def _prompt_for_paths(config_file_path: Path) -> dict:
     return {"config_dir": config_dir, "data_dir": data_dir, "cache_dir": cache_dir}
 
 
-def _prompt_for_enea_credentials() -> dict:
-    """Interactively prompts the user for Enea credentials and verifies them."""
+def _prompt_for_enea_credentials(cookies_file=None, cache_dir=None) -> dict:
+    """
+    Interactively prompts the user for Enea credentials and verifies them.
+
+    `cookies_file` - sesja wyeksportowana z przeglądarki (--import-cookies),
+    używana zamiast logowania hasłem, gdy Enea wymaga reCAPTCHA.
+    `cache_dir` - katalog na profil okna logowania i zapisaną sesję, żeby
+    pierwsze pobieranie zaraz po konfiguracji nie wymagało ponownego logowania.
+    """
+    browser_profile_dir = Path(cache_dir) / "enea_browser_profile" if cache_dir else None
     print("\nProsze podac swoje dane logowania do https://ebok.enea.pl/logowanie")
     email = input("Email: ")
     password = getpass.getpass("Haslo: ")
@@ -156,8 +165,21 @@ def _prompt_for_enea_credentials() -> dict:
     with requests.Session() as session:
         session.headers.update(headers)
         try:
+            if cookies_file:
+                enea_auth.import_cookies_file(session, cookies_file)
             login_page = session.get(enea_auth.LOGIN_URL)
-            enea_auth.interactive_login(session, email, password, login_page)
+            enea_auth.login(
+                session,
+                email,
+                password,
+                login_page,
+                browser_profile_dir=browser_profile_dir,
+            )
+            if cache_dir:
+                Path(cache_dir).mkdir(parents=True, exist_ok=True)
+                enea_auth.save_session_cookies(
+                    session, Path(cache_dir) / SESSION_COOKIES_FILE_NAME
+                )
 
             # Dedykowana strona wyboru klienta, niezależnie od tego, gdzie akurat
             # wylądowaliśmy po (re)autoryzacji (patrz analogiczny komentarz w
@@ -235,7 +257,9 @@ def _prompt_for_enea_credentials() -> dict:
 
 
 def load_config(
-    require_credentials: bool = False, prompt_for_missing: bool = True
+    require_credentials: bool = False,
+    prompt_for_missing: bool = True,
+    cookies_file=None,
 ) -> AppConfig:
     """Loads application config, prompting if missing/incomplete."""
     initial_config_dir = _get_default_dir("config")
@@ -269,7 +293,10 @@ def load_config(
         if not prompt_for_missing:
             raise ValueError("Brakujące dane uwierzytelniające Enea.")
         print("Brak zapisanych danych logowania Enea lub są one niekompletne.")
-        creds = _prompt_for_enea_credentials()
+        creds = _prompt_for_enea_credentials(
+            cookies_file,
+            cache_dir=paths["cache_dir"],
+        )
 
     app_cfg = AppConfig(
         config_dir=paths["config_dir"],

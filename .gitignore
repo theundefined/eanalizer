@@ -28,6 +28,8 @@ config.ini
 
 # zrzuty curl/DevTools z hasłami i tokenami sesji, używane do debugowania logowania
 curls/
+cookies.txt
+*cookies*.txt
 
 # Gemini related files
 .gemini/

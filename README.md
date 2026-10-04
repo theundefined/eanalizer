@@ -40,14 +40,25 @@ Dane o zużyciu energii w formacie CSV można pozyskać na dwa sposoby:
 
     Logowanie Enea wymaga weryfikacji dwuskładnikowej (kod SMS lub e-mail) - `enea-downloader-cli` poprosi o wpisanie kodu w terminalu. Po udanym logowaniu sesja jest zapisywana w katalogu cache, więc kolejne uruchomienia mogą pominąć logowanie i 2FA, dopóki zapisana sesja pozostaje ważna.
 
+    Od października 2026 formularz logowania Enei jest chroniony reCAPTCHA, więc logowanie hasłem z samego terminala nie jest możliwe. `enea-downloader-cli` otwiera wtedy małe okno przeglądarki (pozwalające poruszać się tylko po stronach `*.enea.pl`), z e-mailem i hasłem z konfiguracji wpisanymi już w formularz - wystarczy kliknąć „Zaloguj” i podać kod SMS/e-mail. Formularz nie jest wysyłany automatycznie. Po zalogowaniu okno zamyka się samo, a pobieranie rusza dalej. Okno wymaga jednorazowej instalacji dodatkowych pakietów (PyQt6 + PyQt6-WebEngine, ok. 130 MB):
+
+    ```bash
+    pip install 'eanalizer[browser]'                  # instalacja z PyPI
+    .venv/bin/python -m pip install -e '.[browser]'   # kopia repozytorium (skrypty ./enea-downloader-cli)
+    ```
+
+    Gdy okna nie da się otworzyć (np. serwer bez środowiska graficznego), zaloguj się na [ebok.enea.pl](https://ebok.enea.pl) w zwykłej przeglądarce, wyeksportuj ciasteczka do pliku `cookies.txt` (format Netscape, np. rozszerzeniem „Get cookies.txt LOCALLY” → „Export All Cookies”) i przekaż go flagą `--import-cookies`. Wczytywane są wyłącznie ciasteczka domen `*.enea.pl`. Sesja trafia do katalogu cache, więc wyeksportowany plik można od razu usunąć.
+
     ```bash
     ./enea-downloader-cli
+    ./enea-downloader-cli --import-cookies ~/Pobrane/cookies.txt
     ```
 
     | Flaga       | Skrót | Opis                                                                                                   |
     | ----------- | ----- | -------------------------------------------------------------------------------------------------------- |
     | `--force`   | `-f`  | Wymusza ponowne pobranie danych, nawet jeśli są aktualne.                                                  |
     | `--report`  | `-r`  | Tylko wyświetla zakres danych z plików na dysku (bez pobierania).                                          |
+    | `--import-cookies PLIK` |  | Importuje sesję z pliku `cookies.txt` wyeksportowanego z przeglądarki po zalogowaniu na ebok.enea.pl (alternatywa dla okna logowania, np. bez środowiska graficznego). |
     | `--debug`   |       | Wypisuje dodatkowe informacje diagnostyczne o logowaniu i zapisuje zrzut ciasteczek sesji (nazwa/domena/wygaśnięcie) do katalogu cache. |
 
 ## Lokalizacja plików konfiguracyjnych i danych

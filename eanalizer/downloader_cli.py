@@ -32,15 +32,29 @@ def main():
         "zrzut ciasteczek sesji (nazwa/domena/wygaśnięcie) do katalogu cache.",
     )
 
+    parser.add_argument(
+        "--import-cookies",
+        metavar="PLIK",
+        help="Importuje sesję z pliku cookies.txt (format Netscape) wyeksportowanego "
+        "z przeglądarki po zalogowaniu na ebok.enea.pl - alternatywa dla okna "
+        "logowania, gdy nie da się go otworzyć (np. bez środowiska graficznego).",
+    )
+
     args = parser.parse_args()
 
     try:
         # Load configuration. Credentials are required only if we are not in report-only mode.
-        app_cfg = load_config(require_credentials=not args.report)
+        app_cfg = load_config(
+            require_credentials=not args.report, cookies_file=args.import_cookies
+        )
 
         # Instantiate the downloader with the loaded config and run it.
         downloader = EneaDownloader(
-            app_cfg, force=args.force, report_only=args.report, debug=args.debug
+            app_cfg,
+            force=args.force,
+            report_only=args.report,
+            debug=args.debug,
+            cookies_file=args.import_cookies,
         )
         downloader.download_data()
 

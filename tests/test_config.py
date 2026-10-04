@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from requests.cookies import RequestsCookieJar
+
 from eanalizer.config import (
     AppConfig,
     _get_default_dir,
@@ -218,7 +220,15 @@ class TestPromptForEneaCredentials(unittest.TestCase):
         # Kolejne wywołania input(): najpierw email, potem kod weryfikacyjny 2FA.
         mock_input.side_effect = ["user@example.com", "123456"]
 
-        creds = _prompt_for_enea_credentials()
+        mock_session.cookies = RequestsCookieJar()
+        mock_session.cookies.set("EBOK_SESSION", "abc", domain="ebok.enea.pl")
+
+        with tempfile.TemporaryDirectory() as cache_dir:
+            creds = _prompt_for_enea_credentials(cache_dir=cache_dir)
+            # Sesja z pierwszej konfiguracji jest zapisywana, by zaraz następujące
+            # pobieranie nie wymagało drugiego logowania (i drugiego kodu 2FA).
+            saved = (Path(cache_dir) / "enea_session_cookies.txt").read_text()
+        self.assertIn("EBOK_SESSION", saved)
 
         self.assertEqual(
             creds,
