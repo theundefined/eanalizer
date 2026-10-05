@@ -5,7 +5,9 @@ import locale
 import os
 from pathlib import Path
 
-from .config import load_config
+import pandas as pd
+
+from .config import has_legacy_default_tariffs, load_config
 from .core import (
     PREDEFINED_PERIODS,
     aggregate_daily_data,
@@ -23,7 +25,8 @@ from .core import (
     run_tariff_comparison,
 )
 from .data_loader import load_from_enea_csv
-from .price_fetcher import get_hourly_rce_prices
+from .netbilling import WYCENY, print_net_billing_summary, settle_net_billing
+from .price_fetcher import get_hourly_rce_prices, get_monthly_rcem_prices
 from .tariffs import TariffManager
 
 # --- i18n setup ---
@@ -154,6 +157,23 @@ def main():
         help=_("Coefficient for energy returned in net-metering (default: 0.8)."),
     )
     parser.add_argument(
+        "--z-netbilling",
+        action="store_true",
+        help=_(
+            "Settles costs in the net-billing system (prosumer deposit valued "
+            "at RCEm/RCE market prices)."
+        ),
+    )
+    parser.add_argument(
+        "--wycena-netbilling",
+        choices=WYCENY,
+        default="rcem",
+        help=_(
+            "Valuation of exported energy in net-billing: rcem (monthly price, "
+            "default) or rce (hourly prices, from 07.2024)."
+        ),
+    )
+    parser.add_argument(
         "--porownaj-taryfy",
         action="store_true",
         help=_("Runs a comparison of all available tariffs for the given period."),
@@ -180,8 +200,20 @@ def main():
         )
     if args.ostatnie_dni is not None and args.ostatnie_dni <= 0:
         parser.error(_("--ostatnie-dni musi być liczbą całkowitą dodatnią."))
+    if args.z_netbilling and args.z_netmetering:
+        parser.error(_("Nie można jednocześnie użyć --z-netbilling i --z-netmetering."))
+    if args.z_netbilling and args.z_cenami_rce:
+        parser.error(_("Nie można jednocześnie użyć --z-netbilling i --z-cenami-rce."))
 
     app_cfg = load_config()
+    if has_legacy_default_tariffs(app_cfg.tariffs_file):
+        print(
+            _(
+                "Uwaga: plik taryf {} zawiera nieaktualne strefy czasowe (G12 bez "
+                "strefy nocnej 13-15, G12w ze szczytem do 22 zamiast do 21). Usuń "
+                "go, aby przy następnym uruchomieniu utworzyć poprawny plik domyślny."
+            ).format(app_cfg.tariffs_file)
+        )
 
     # Data loading
     files_to_process = []
@@ -243,6 +275,24 @@ def main():
     )
     storage_efficiency = args.sprawnosc_magazynu
 
+    net_billing = None
+    if args.z_netbilling:
+        start_ts = filtered_data[0].timestamp
+        end_ts = filtered_data[-1].timestamp
+        months = [
+            str(p) for p in pd.period_range(start=start_ts, end=end_ts, freq="M")
+        ]
+        rce_prices = {}
+        if args.wycena_netbilling == "rce":
+            rce_prices = get_hourly_rce_prices(
+                start_ts, end_ts, cache_dir=app_cfg.cache_dir
+            )
+        net_billing = {
+            "rce_prices": rce_prices,
+            "rcem_prices": get_monthly_rcem_prices(months, cache_dir=app_cfg.cache_dir),
+            "wycena": args.wycena_netbilling,
+        }
+
     # --- Main analysis logic ---
     if args.z_cenami_rce:
         if capacity > 0 or net_metering_ratio is not None:
@@ -293,6 +343,7 @@ def main():
             net_metering_ratio=net_metering_ratio,
             storage_efficiency=storage_efficiency,
             verbose=args.verbose,
+            net_billing=net_billing,
         )
     else:
         # Single analysis run
@@ -304,7 +355,19 @@ def main():
             net_metering_ratio=net_metering_ratio,
             storage_efficiency=storage_efficiency,
         )
-        print_analysis_summary(summary, capacity, args.taryfa, net_metering_ratio)
+        if net_billing is not None:
+            nb_summary = settle_net_billing(
+                simulation_df,
+                tariff_manager,
+                args.taryfa,
+                rce_prices=net_billing["rce_prices"],
+                rcem_prices=net_billing["rcem_prices"],
+                wycena=net_billing["wycena"],
+                fixed_fee=summary.get("oplaty_stale", 0.0),
+            )
+            print_net_billing_summary(nb_summary, args.taryfa, capacity)
+        else:
+            print_analysis_summary(summary, capacity, args.taryfa, net_metering_ratio)
 
         # Post-analysis actions for single run
         daily_data_df = aggregate_daily_data(filtered_data)

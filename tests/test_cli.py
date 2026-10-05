@@ -10,7 +10,7 @@ from eanalizer.cli import main
 from eanalizer.config import AppConfig
 
 
-def _run_cli(argv, app_config, rce_prices=None):
+def _run_cli(argv, app_config, rce_prices=None, rcem_prices=None):
     """Uruchamia main() CLI z podanymi argumentami, mockując load_config i
     get_hourly_rce_prices (by nie wykonywać realnych zapytań sieciowych do PSE),
     oraz wymuszając identycznościową funkcję i18n `_`, by asercje na tekstach
@@ -22,6 +22,8 @@ def _run_cli(argv, app_config, rce_prices=None):
     try:
         with patch("eanalizer.cli.load_config", return_value=app_config), patch(
             "eanalizer.cli.get_hourly_rce_prices", return_value=rce_prices or {}
+        ), patch(
+            "eanalizer.cli.get_monthly_rcem_prices", return_value=rcem_prices or {}
         ), patch("eanalizer.cli._", new=lambda s: s):
             main()
     finally:
@@ -46,7 +48,9 @@ class TestCli(unittest.TestCase):
         tariffs_path.write_text(
             "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
             "G11,stala,all,0,24,0.6,0.3,40.0\n"
-            "G12,dzienna,all,6,22,0.7,0.4,46.0\n"
+            "G12,dzienna,all,6,13,0.7,0.4,46.0\n"
+            "G12,nocna,all,13,15,0.4,0.2,46.0\n"
+            "G12,dzienna,all,15,22,0.7,0.4,46.0\n"
             "G12,nocna,all,22,6,0.4,0.2,46.0\n",
             encoding="utf-8",
         )
@@ -61,12 +65,53 @@ class TestCli(unittest.TestCase):
         output = _run_cli(["--katalog", str(empty_data_dir)], self.app_config)
         self.assertIn("No .csv files found for processing", output)
 
+    def test_net_billing_single_analysis(self):
+        output = _run_cli(
+            ["--katalog", str(self.data_dir), "--taryfa", "G11", "--z-netbilling"],
+            self.app_config,
+            rcem_prices={"2024-05": 0.3},
+        )
+        self.assertIn("Rozliczenie net-billing dla taryfy G11", output)
+        self.assertIn("SUMARYCZNY KOSZT (net-billing)", output)
+        self.assertNotIn("brak cen RCEm", output)
+
+    def test_net_billing_tariff_comparison(self):
+        output = _run_cli(
+            ["--katalog", str(self.data_dir), "--porownaj-taryfy", "--z-netbilling"],
+            self.app_config,
+            rcem_prices={"2024-05": 0.3},
+        )
+        self.assertIn("Uwzględniono net-billing", output)
+        self.assertIn("Najkorzystniejsza taryfa", output)
+
+    def test_net_billing_conflicts_with_net_metering(self):
+        original_stderr, sys.stderr = sys.stderr, StringIO()
+        try:
+            with self.assertRaises(SystemExit):
+                _run_cli(
+                    ["--katalog", str(self.data_dir), "--z-netbilling", "--z-netmetering"],
+                    self.app_config,
+                )
+        finally:
+            sys.stderr = original_stderr
+
+    def test_legacy_tariffs_file_warning(self):
+        tariffs_path = self.config_dir / "tariffs.csv"
+        tariffs_path.write_text(
+            tariffs_path.read_text(encoding="utf-8")
+            + "G12w,szczytowa,weekday,6,22,0.8,0.38,55.0\n",
+            encoding="utf-8",
+        )
+        output = _run_cli(["--katalog", str(self.data_dir)], self.app_config)
+        self.assertIn("zawiera nieaktualne strefy czasowe", output)
+
     def test_single_analysis_prints_summary(self):
         output = _run_cli(
             ["--katalog", str(self.data_dir), "--taryfa", "G11"], self.app_config
         )
         self.assertIn("Analiza zużycia i kosztów", output)
         self.assertIn("SUMARYCZNY KOSZT", output)
+        self.assertNotIn("zawiera nieaktualne strefy czasowe", output)
 
     def test_rce_mode_warns_about_ignored_storage_flags(self):
         output = _run_cli(

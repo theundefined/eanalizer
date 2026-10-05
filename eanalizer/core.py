@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Tuple, Any
 from datetime import datetime, date, timedelta
 from .models import EnergyData, SimulationResult
 from .tariffs import TariffManager
+from .netbilling import print_net_billing_summary, settle_net_billing
 import pandas as pd
 
 
@@ -219,10 +220,13 @@ def run_tariff_comparison(
     net_metering_ratio: Optional[float],
     storage_efficiency: float,
     verbose: bool = False,
+    net_billing: Optional[Dict[str, Any]] = None,
 ):
     """
     Calculates and prints the cost for all available tariffs, with or without
     a physical storage simulation.
+    net_billing: optional dict with keys "rce_prices", "rcem_prices" and
+    "wycena" - when given, costs are settled in the net-billing system.
     """
     all_tariffs = tariff_manager.get_all_tariffs()
     results = {}
@@ -238,7 +242,7 @@ def run_tariff_comparison(
         )
 
     for tariff in all_tariffs:
-        summary, _ = run_full_analysis(
+        summary, simulation_df = run_full_analysis(
             data,
             capacity,
             tariff_manager,
@@ -246,7 +250,19 @@ def run_tariff_comparison(
             net_metering_ratio,
             storage_efficiency,
         )
-        if verbose:
+        if net_billing is not None:
+            summary = settle_net_billing(
+                simulation_df,
+                tariff_manager,
+                tariff,
+                rce_prices=net_billing["rce_prices"],
+                rcem_prices=net_billing["rcem_prices"],
+                wycena=net_billing["wycena"],
+                fixed_fee=summary.get("oplaty_stale", 0.0),
+            )
+            if verbose:
+                print_net_billing_summary(summary, tariff, capacity)
+        elif verbose:
             print_analysis_summary(summary, capacity, tariff, net_metering_ratio)
 
         cost = summary.get("calkowity_koszt")
@@ -269,6 +285,8 @@ def run_tariff_comparison(
     )
     if net_metering_ratio:
         print(f"Uwzględniono net-metering ze współczynnikiem {net_metering_ratio}")
+    if net_billing is not None:
+        print(f"Uwzględniono net-billing (wycena: {net_billing['wycena'].upper()})")
     print("---------------------------------------------")
     for tariff, cost in sorted_results:
         b = breakdown[tariff]

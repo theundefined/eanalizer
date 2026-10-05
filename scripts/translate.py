@@ -21,6 +21,8 @@ translations = {
     "Found {} files to process:": "Znaleziono {} plikow do przetworzenia:",
     "Total loaded {} records.": "Lacznia wczytano {} rekordow.",
     "No data in the given date range for further analysis.": "Brak danych w podanym zakresie dat do dalszej analizy.",
+    "Settles costs in the net-billing system (prosumer deposit valued at RCEm/RCE market prices).": "Rozlicza koszty w systemie net-billing (depozyt prosumencki wyceniany po cenach rynkowych RCEm/RCE).",
+    "Valuation of exported energy in net-billing: rcem (monthly price, default) or rce (hourly prices, from 07.2024).": "Wycena energii oddanej w net-billingu: rcem (cena miesieczna, domyslnie) lub rce (ceny godzinowe, od 07.2024).",
 }
 
 po = polib.pofile("locales/pl/LC_MESSAGES/eanalizer.po")

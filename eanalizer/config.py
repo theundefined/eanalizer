@@ -16,6 +16,47 @@ CONFIG_FILE_NAME = "config.ini"
 SESSION_COOKIES_FILE_NAME = "enea_session_cookies.txt"
 DEFAULT_TARIFFS_FILE = "tariffs.csv"
 
+# Ceny brutto (z VAT 23%) na podstawie taryfy ENEA Operator 2026.
+# Strefy czasowe wg taryfy ENEA Operator (pkt 3.2.5 i 3.2.7):
+# - G12: strefa nocna 13-15 i 22-6, dzienna 6-13 i 15-22 (codziennie),
+# - G12w: szczyt 6-21 w dni robocze, poza szczytem 21-6 oraz cale weekendy i swieta.
+DEFAULT_TARIFFS_CSV = (
+    "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
+    "G11,stala,all,0,24,0.61254,0.35547,43.4682\n"
+    "G12,nocna,all,22,6,0.414387,0.165681,46.1004\n"
+    "G12,nocna,all,13,15,0.414387,0.165681,46.1004\n"
+    "G12,dzienna,all,6,13,0.710817,0.395199,46.1004\n"
+    "G12,dzienna,all,15,22,0.710817,0.395199,46.1004\n"
+    "G12w,pozaszczytowa,weekday,0,6,0.426195,0.153381,55.0302\n"
+    "G12w,szczytowa,weekday,6,21,0.801714,0.385728,55.0302\n"
+    "G12w,pozaszczytowa,weekday,21,24,0.426195,0.153381,55.0302\n"
+    "G12w,pozaszczytowa,weekend,0,24,0.426195,0.153381,55.0302\n"
+)
+
+# Wiersze z wcześniejszych wersji domyślnego pliku taryf, które miały błędne
+# godziny stref (G12 bez okna 13-15, G12w ze szczytem do 22 zamiast do 21).
+LEGACY_DEFAULT_TARIFF_ROWS = (
+    "G12,dzienna,all,6,22,",
+    "G12w,szczytowa,weekday,6,22,",
+)
+
+
+def has_legacy_default_tariffs(tariffs_file: Path) -> bool:
+    """
+    Sprawdza, czy plik taryf zawiera wiersze z dawnej, błędnej wersji
+    domyślnych stref czasowych G12/G12w (plik tworzony jest tylko raz, więc
+    starsze instalacje nie dostaną poprawki automatycznie).
+    """
+    try:
+        content = tariffs_file.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(
+        line.startswith(row)
+        for line in content.splitlines()
+        for row in LEGACY_DEFAULT_TARIFF_ROWS
+    )
+
 
 @dataclass
 class AppConfig:
@@ -309,20 +350,7 @@ def load_config(
 
     if not app_cfg.tariffs_file.is_file():
         print(f"Tworzenie domyslnego pliku taryf w: {app_cfg.tariffs_file}")
-        # Ceny brutto (z VAT 23%) na podstawie taryfy ENEA Operator 2026.
-        default_tariffs_content = (
-            "tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee\n"
-            "G11,stala,all,0,24,0.61254,0.35547,43.4682\n"
-            "G12,nocna,all,22,6,0.414387,0.165681,46.1004\n"
-            "G12,dzienna,all,6,22,0.710817,0.395199,46.1004\n"
-            "G12w,pozaszczytowa,weekday,0,6,0.426195,0.153381,55.0302\n"
-            "G12w,szczytowa,weekday,6,22,0.801714,0.385728,55.0302\n"
-            "G12w,pozaszczytowa,weekday,22,24,0.426195,0.153381,55.0302\n"
-            "G12w,pozaszczytowa,weekend,0,24,0.426195,0.153381,55.0302\n"
-        )
-        app_cfg.tariffs_file.write_text(
-            default_tariffs_content.replace("\\n", "\n"), encoding="utf-8"
-        )
+        app_cfg.tariffs_file.write_text(DEFAULT_TARIFFS_CSV, encoding="utf-8")
 
     app_cfg.save()
     return app_cfg

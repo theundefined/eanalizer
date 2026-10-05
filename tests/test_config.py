@@ -9,7 +9,9 @@ from unittest.mock import MagicMock, patch
 from requests.cookies import RequestsCookieJar
 
 from eanalizer.config import (
+    DEFAULT_TARIFFS_CSV,
     AppConfig,
+    has_legacy_default_tariffs,
     _get_default_dir,
     _get_dev_root,
     _prompt_for_enea_credentials,
@@ -49,6 +51,28 @@ class TestAppConfig(unittest.TestCase):
         cfg = self._make_config()
         self.assertEqual(cfg.tariffs_file, cfg.config_dir / "tariffs.csv")
         self.assertEqual(cfg.config_file, cfg.config_dir / "config.ini")
+
+    def test_repo_tariffs_file_matches_default(self):
+        """config/tariffs.csv w repozytorium musi być zgodny z domyślnym plikiem taryf."""
+        repo_file = Path(__file__).resolve().parent.parent / "config" / "tariffs.csv"
+        self.assertEqual(repo_file.read_text(encoding="utf-8"), DEFAULT_TARIFFS_CSV)
+
+    def test_has_legacy_default_tariffs(self):
+        tariffs_file = self.tmp_dir / "tariffs.csv"
+        tariffs_file.write_text(DEFAULT_TARIFFS_CSV, encoding="utf-8")
+        self.assertFalse(has_legacy_default_tariffs(tariffs_file))
+
+        legacy = DEFAULT_TARIFFS_CSV.replace(
+            "G12w,szczytowa,weekday,6,21,", "G12w,szczytowa,weekday,6,22,"
+        )
+        tariffs_file.write_text(legacy, encoding="utf-8")
+        self.assertTrue(has_legacy_default_tariffs(tariffs_file))
+
+        legacy_g12 = "tariff,zone_name\nG12,dzienna,all,6,22,0.7,0.39,46.1\n"
+        tariffs_file.write_text(legacy_g12, encoding="utf-8")
+        self.assertTrue(has_legacy_default_tariffs(tariffs_file))
+
+        self.assertFalse(has_legacy_default_tariffs(self.tmp_dir / "brak.csv"))
 
     def test_save_writes_paths_and_credentials(self):
         cfg = self._make_config(

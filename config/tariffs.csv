@@ -1,8 +1,10 @@
 tariff,zone_name,day_type,start_hour,end_hour,energy_price,dist_price,dist_fee
 G11,stala,all,0,24,0.61254,0.35547,43.4682
 G12,nocna,all,22,6,0.414387,0.165681,46.1004
-G12,dzienna,all,6,22,0.710817,0.395199,46.1004
+G12,nocna,all,13,15,0.414387,0.165681,46.1004
+G12,dzienna,all,6,13,0.710817,0.395199,46.1004
+G12,dzienna,all,15,22,0.710817,0.395199,46.1004
 G12w,pozaszczytowa,weekday,0,6,0.426195,0.153381,55.0302
-G12w,szczytowa,weekday,6,22,0.801714,0.385728,55.0302
-G12w,pozaszczytowa,weekday,22,24,0.426195,0.153381,55.0302
+G12w,szczytowa,weekday,6,21,0.801714,0.385728,55.0302
+G12w,pozaszczytowa,weekday,21,24,0.426195,0.153381,55.0302
 G12w,pozaszczytowa,weekend,0,24,0.426195,0.153381,55.0302

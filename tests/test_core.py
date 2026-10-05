@@ -110,7 +110,9 @@ class TestCoreFunctionality(unittest.TestCase):
         mock_urlopen.assert_called_once()
         self.assertTrue(os.path.exists(cache_file))
         self.assertAlmostEqual(prices[datetime(2024, 7, 1, 0, 0)], 0.4)
-        self.assertAlmostEqual(prices[datetime(2024, 7, 1, 1, 0)], 0.7)
+        # "dtime" z API PSE to koniec kwadransa: 01:00 zamyka godzinę 00:00-01:00,
+        # więc godzina 01:00 to wyłącznie kwadranse 01:15-02:00 (800 zł/MWh).
+        self.assertAlmostEqual(prices[datetime(2024, 7, 1, 1, 0)], 0.8)
 
         test_energy_data = [d for d in self.test_data if d.timestamp.day == 1]
         test_energy_data[0].timestamp = datetime(2024, 7, 1, 0, 0)
@@ -127,7 +129,7 @@ class TestCoreFunctionality(unittest.TestCase):
 
         output = captured_output.getvalue()
         self.assertIn("SUMARYCZNY KOSZT energii pobranej: 0.40 zł", output)
-        self.assertIn("SUMARYCZNY PRZYCHÓD z energii oddanej: 1.75 zł", output)
+        self.assertIn("SUMARYCZNY PRZYCHÓD z energii oddanej: 2.00 zł", output)
 
     @patch("urllib.request.urlopen")
     def test_rce_fetch_failure_is_not_cached(self, mock_urlopen):

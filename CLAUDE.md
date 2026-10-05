@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-`eanalizer` is a Python CLI for analyzing home energy consumption/production data exported from the Enea utility (Poland). It calculates costs across tariffs (G11, G12, G12w), simulates net-metering and physical battery storage, and can correlate consumption with real hourly market prices (RCE) from the PSE API. A companion tool, `enea-downloader`, logs into the Enea eBOK web portal and downloads the source CSVs automatically.
+`eanalizer` is a Python CLI for analyzing home energy consumption/production data exported from the Enea utility (Poland). It calculates costs across tariffs (G11, G12, G12w), simulates net-metering, net-billing and physical battery storage, and can correlate consumption with real hourly market prices (RCE) from the PSE API. A companion tool, `enea-downloader`, logs into the Enea eBOK web portal and downloads the source CSVs automatically.
 
 ## Commands
 
@@ -34,11 +34,13 @@ Lint (as run in CI):
 ruff check .
 ```
 
-Update translations (after adding/changing any user-facing `_(...)` string in `cli.py`):
+Update translations (after adding/changing any user-facing `_(...)` string in `cli.py`). Note: `update_translations.sh` `cd`s to the parent of the repo, so run the steps manually from the repo root:
 
 ```bash
-./update_translations.sh
-python scripts/translate.py   # apply automatic translations from the dictionary
+.venv/bin/pybabel extract -F babel.cfg -o locales/eanalizer.pot .
+.venv/bin/pybabel update -i locales/eanalizer.pot -d locales -l pl --domain eanalizer
+python scripts/translate.py   # apply automatic translations from the dictionary (needs polib)
+.venv/bin/pybabel compile -d locales --domain eanalizer
 # then manually review locales/pl/LC_MESSAGES/eanalizer.po for anything untranslated
 ```
 
@@ -52,11 +54,12 @@ python scripts/translate.py   # apply automatic translations from the dictionary
   - `run_tariff_comparison` calls `run_full_analysis` once per tariff and ranks results.
   - `run_rce_analysis` is a separate, simpler cost model driven by real hourly market prices instead of tariff zones.
   - Other functions: date filtering, daily aggregation, missing-hour detection, optimal-battery-capacity calculation (max of "cover net-export days" vs "cover peak-zone arbitrage" capacity), CSV export.
+- **`eanalizer/netbilling.py`** — `settle_net_billing` settles the hourly simulation output of `run_full_analysis` (`pobor_z_sieci`/`oddanie_do_sieci`) in the net-billing system: tariff-priced imports, prosumer deposit from exports valued at RCEm (monthly) or RCE (hourly, from 07.2024, negative prices → 0), ×1.23 from 02.2025, deposit usable from the next month for 12 months against the energy component only (oldest first), 20%/30% refund of expired surplus. Used by the single-run path in `cli.py` and by `run_tariff_comparison(net_billing=...)`.
 - **`eanalizer/tariffs.py`** (`TariffManager`) — reads zone/price rules from a CSV (`tariff, zone_name, day_type, start_hour, end_hour, energy_price, dist_price, dist_fee`), resolves the zone+price for a given timestamp using `holidays.Poland()` for weekend/holiday detection, and handles overnight zones (start_hour > end_hour).
 - **`eanalizer/data_loader.py`** — parses Enea's quirky CSV export format (BOM, null bytes, `="..."`-wrapped timestamps, comma decimals, both pre- and post-balancing volume columns) into `EnergyData` records.
 - **`eanalizer/models.py`** — two `@dataclass`es: `EnergyData` (raw hourly import/export volumes) and `SimulationResult` (hourly simulation output incl. storage state).
-- **`eanalizer/price_fetcher.py`** — fetches/caches hourly RCE prices from the PSE API (`api.raporty.pse.pl`) as one JSON file per day under the cache dir; resamples 15-min data to hourly means.
-- **`eanalizer/config.py`** (`AppConfig`) — resolves config/data/cache directories. When run from a dev checkout (a `pyproject.toml` is present in cwd) it defaults to `./config`, `./data`, `./cache`; otherwise it uses `platformdirs` OS-standard locations. Interactively prompts for and persists these paths plus Enea credentials in `config.ini` on first run. Also seeds a default `tariffs.csv` (2026 ENEA Operator gross prices) if none exists.
+- **`eanalizer/price_fetcher.py`** — fetches/caches hourly RCE prices from the PSE API (`api.raporty.pse.pl`) as one JSON file per day under the cache dir; resamples 15-min data to hourly means (PSE `dtime` marks the *end* of each quarter, so it is shifted back 15 min to match Enea's hour-start timestamps). `get_monthly_rcem_prices` scrapes monthly RCEm (latest correction wins) from the PSE website into `rcem.json` in the cache dir.
+- **`eanalizer/config.py`** (`AppConfig`) — resolves config/data/cache directories. When run from a dev checkout (a `pyproject.toml` is present in cwd) it defaults to `./config`, `./data`, `./cache`; otherwise it uses `platformdirs` OS-standard locations. Interactively prompts for and persists these paths plus Enea credentials in `config.ini` on first run. Also seeds a default `tariffs.csv` (`DEFAULT_TARIFFS_CSV`, 2026 ENEA Operator gross prices; must stay identical to `config/tariffs.csv`) if none exists; `has_legacy_default_tariffs` detects files seeded by older versions with wrong G12/G12w zone hours.
 - **`eanalizer/downloader.py`** (`EneaDownloader`) / **`downloader_cli.py`** — logs into `ebok.enea.pl` (scrapes a CSRF token, follows the multi-client selection flow), downloads one CSV per available year, and skips re-downloading current-year data less than an hour old unless `--force` is passed. `--report`/`-r` only reports the on-disk data range without downloading.
 
 ## Data flow

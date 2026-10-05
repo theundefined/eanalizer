@@ -8,7 +8,7 @@ _eanalizer_completions()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Główne opcje
-    opts="--pliki --katalog --taryfa --data-start --data-koniec --magazyn-fizyczny --eksport-symulacji --eksport-dzienny --oblicz-optymalny-magazyn --z-cenami-rce --z-netmetering --wspolczynnik-netmetering"
+    opts="--pliki --katalog --taryfa --data-start --data-koniec --magazyn-fizyczny --eksport-symulacji --eksport-dzienny --oblicz-optymalny-magazyn --z-cenami-rce --z-netmetering --wspolczynnik-netmetering --z-netbilling --wycena-netbilling"
 
     # Podpowiedzi dla konkretnych opcji
     case "${prev}" in
@@ -18,6 +18,10 @@ _eanalizer_completions()
             ;;
         --wspolczynnik-netmetering)
             COMPREPLY=( $(compgen -W "0.7 0.8" -- "${cur}") )
+            return 0
+            ;;
+        --wycena-netbilling)
+            COMPREPLY=( $(compgen -W "rcem rce" -- "${cur}") )
             return 0
             ;;
         --katalog|--pliki|--eksport-symulacji|--eksport-dzienny)

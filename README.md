@@ -6,6 +6,7 @@ W większości stworzona przy użyciu [asystenta AI Gemini](https://gemini.googl
 ## Główne funkcjonalności
 
 -   **Wszechstronna Analiza**: Obliczaj koszty energii w oparciu o różne taryfy (G11, G12, G12w), symuluj system net-metering lub fizyczny magazyn energii.
+-   **Net-billing**: Rozliczaj prosumenta w systemie net-billing - depozyt prosumencki wyceniany po cenach RCEm lub RCE (pobieranych z PSE), z współczynnikiem 1,23, 12-miesięczną ważnością depozytu i zwrotem nadpłaty.
 -   **Analiza Rynkowa**: Wykorzystaj rzeczywiste, godzinowe ceny rynkowe (RCE) pobierane z API PSE do precyzyjnej analizy finansowej.
 -   **Optymalizacja Magazynu**: Oblicz optymalną pojemność magazynu energii w dwóch scenariuszach: dla samowystarczalności oraz dla arbitrażu taryfowego.
 -   **Porównanie Taryf**: Automatycznie porównaj koszty dla wszystkich dostępnych taryf, aby znaleźć najkorzystniejszą opcję dla Twojego profilu zużycia.
@@ -108,7 +109,17 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 ./eanalizer-cli --taryfa G12w --okres ostatnie-365-dni
 ```
 
-**7. Zbiorcze zestawienie miesięczne (pobrane/wysłane, przed i po bilansowaniu)**
+**7. Rozliczenie w systemie net-billing (wycena miesięczna RCEm)**
+```bash
+./eanalizer-cli --taryfa G12w --z-netbilling --okres poprzedni-rok
+```
+
+**8. Porównanie taryf w net-billingu z wyceną godzinową (RCE) i magazynem 10 kWh**
+```bash
+./eanalizer-cli --porownaj-taryfy --z-netbilling --wycena-netbilling rce --magazyn-fizyczny 10
+```
+
+**9. Zbiorcze zestawienie miesięczne (pobrane/wysłane, przed i po bilansowaniu)**
 ```bash
 ./eanalizer-cli --taryfa G12w --okres biezacy-rok --miesieczne --eksport-miesieczny dane_miesieczne.csv
 ```
@@ -128,6 +139,8 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 | `--sprawnosc-magazynu <0.0-1.0>`  |       | Sprawność magazynu fizycznego (domyślnie `0.9`).                                                      |
 | `--z-netmetering`                 |       | Włącza obliczenia dla wirtualnego magazynu (net-metering).                                          |
 | `--wspolczynnik-netmetering <0.7/0.8>` |  | Współczynnik dla energii oddawanej w net-meteringu (domyślnie `0.8`).                                 |
+| `--z-netbilling`                  |       | Rozlicza koszty w systemie net-billing (depozyt prosumencki). Wzajemnie wykluczający się z `--z-netmetering` i `--z-cenami-rce`. Działa też z `--magazyn-fizyczny` i `--porownaj-taryfy`. |
+| `--wycena-netbilling <rcem/rce>`  |       | Wycena energii oddanej w net-billingu: `rcem` - miesięczna cena RCEm (domyślnie), `rce` - godzinowe ceny RCE (od 07.2024; wcześniejsze miesiące zawsze wg RCEm). |
 | `--z-cenami-rce`                  |       | Używa rzeczywistych cen rynkowych (RCE) zamiast stałych cen taryfowych.                               |
 | `--porownaj-taryfy`               |       | Uruchamia porównanie kosztów dla wszystkich dostępnych taryf.                                         |
 | `--oblicz-optymalny-magazyn`      |       | Oblicza i wyświetla optymalną pojemność magazynu dla dwóch scenariuszy.                             |
@@ -137,7 +150,23 @@ Symulacja magazynu o pojemności 10 kWh i sprawności 90%.
 | `--eksport-miesieczny <plik.csv>` |       | Eksportuje zagregowane dane miesięczne do pliku CSV.                                                   |
 | `--verbose`                       | `-v`  | Włącza tryb szczegółowy, np. dla porównania taryf.                                                  |
 
-> **Uwaga:** `--z-cenami-rce` nie obsługuje symulacji magazynu ani net-meteringu (`--magazyn-fizyczny`, `--z-netmetering`, `--sprawnosc-magazynu`) ani eksportu/obliczania optymalnego magazynu. `--porownaj-taryfy` nie obsługuje eksportu ani obliczania optymalnego magazynu. Te flagi, jeśli podane w niewspieranym trybie, zostaną zignorowane, o czym program wypisze stosowne ostrzeżenie.
+> **Uwaga:** `--z-cenami-rce` to uproszczony model, w którym zarówno pobór, jak i oddanie wyceniane są po RCE - do rzeczywistego rozliczenia prosumenta użyj `--z-netbilling`. `--z-cenami-rce` nie obsługuje symulacji magazynu ani net-meteringu (`--magazyn-fizyczny`, `--z-netmetering`, `--sprawnosc-magazynu`) ani eksportu/obliczania optymalnego magazynu. `--porownaj-taryfy` nie obsługuje eksportu ani obliczania optymalnego magazynu. Te flagi, jeśli podane w niewspieranym trybie, zostaną zignorowane, o czym program wypisze stosowne ostrzeżenie.
+
+### Net-billing - przyjęte zasady rozliczenia
+
+Rozliczenie (`--z-netbilling`) odwzorowuje zasady z ustawy OZE i warunków Enei dla prosumentów net-billing:
+
+-   Energia pobrana z sieci (po bilansowaniu godzinowym) jest kupowana po cenach z `tariffs.csv` - osobno część energetyczna (`energy_price`) i dystrybucyjna (`dist_price`).
+-   Energia oddana tworzy depozyt prosumencki: ilość × RCEm danego miesiąca (wycena `rcem`) lub suma godzinowych iloczynów ilość × RCE (wycena `rce`, ujemne ceny liczone jako 0). Ceny RCEm pobierane są ze strony PSE (z uwzględnieniem korekt), a RCE z API PSE; obie są cachowane w katalogu cache.
+-   Od 02.2025 wartość depozytu jest mnożona przez współczynnik 1,23.
+-   Depozyt z danego miesiąca jest dostępny od kolejnego miesiąca przez 12 miesięcy i pokrywa **wyłącznie koszt energii** - opłaty dystrybucyjne i stałe płacone są zawsze. Najstarsze środki wykorzystywane są w pierwszej kolejności.
+-   Niewykorzystany depozyt po 12 miesiącach jest zwracany do 20% wartości depozytu miesięcznego (30% przy wycenie godzinowej RCE od 02.2025); zwrot nadpłaty liczony jest dla depozytów wygasających od 07.2024. Reszta przepada.
+
+Ograniczenia: dla wszystkich lat stosowane są ceny z bieżącego `tariffs.csv`, a opłaty stałe liczone są za pełne miesiące.
+
+### Strefy czasowe taryf Enea
+
+Domyślny `tariffs.csv` odwzorowuje strefy z taryfy ENEA Operator: G12 - strefa nocna 13:00-15:00 i 22:00-6:00; G12w - szczyt 6:00-21:00 w dni robocze, poza szczytem 21:00-6:00 oraz całe weekendy i święta. Starsze wersje programu tworzyły plik z błędnymi godzinami (G12 bez okna 13-15, G12w ze szczytem do 22:00) - program ostrzeże o tym przy uruchomieniu; wystarczy usunąć `tariffs.csv`, aby przy kolejnym uruchomieniu powstał poprawny plik.
 
 ## Rozwój i Testowanie
 

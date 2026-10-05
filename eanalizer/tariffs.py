@@ -1,13 +1,16 @@
 import pandas as pd
 import holidays
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class TariffManager:
     def __init__(self, config_path: str, years: range):
         self.tariffs_df = pd.read_csv(config_path)
         self.holidays = holidays.Poland(years=years)
+        # Strefa i ceny zależą tylko od (taryfa, typ dnia, godzina) - cache
+        # oszczędza wielokrotnego filtrowania DataFrame dla każdej godziny danych.
+        self._zone_cache: Dict[Tuple[str, str, int], Tuple] = {}
 
     def get_zone_and_price(
         self, timestamp: datetime, tariff: str
@@ -19,7 +22,14 @@ class TariffManager:
             else "weekday"
         )
         hour = timestamp.hour
+        key = (tariff.lower(), day_type, hour)
+        if key not in self._zone_cache:
+            self._zone_cache[key] = self._resolve_zone(tariff, day_type, hour)
+        return self._zone_cache[key]
 
+    def _resolve_zone(
+        self, tariff: str, day_type: str, hour: int
+    ) -> Tuple[Optional[str], float, float]:
         rules = self.tariffs_df[self.tariffs_df["tariff"].str.lower() == tariff.lower()]
         if not rules.empty and "all" in rules["day_type"].unique():
             day_type = "all"
@@ -40,7 +50,7 @@ class TariffManager:
 
     def get_fixed_fee(self, tariff: str) -> float:
         """Zwraca stałą opłatę miesięczną dla danej taryfy."""
-        rules = self.tariffs_df[self.tariffs_df["tariff"] == tariff]
+        rules = self.tariffs_df[self.tariffs_df["tariff"].str.lower() == tariff.lower()]
         if not rules.empty:
             return rules.iloc[0]["dist_fee"]
         return 0.0
